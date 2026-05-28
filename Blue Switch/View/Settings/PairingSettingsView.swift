@@ -1,0 +1,196 @@
+import SwiftUI
+
+/// Settings tab for managing the device-pairing pre-shared key.
+struct PairingSettingsView: View {
+  // MARK: - State
+
+  @ObservedObject private var pairing = PairingStore.shared
+
+  @State private var showGenerateSheet = false
+  @State private var showEnterSheet = false
+  @State private var showUnpairAlert = false
+
+  // MARK: - Body
+
+  var body: some View {
+    Group {
+      if pairing.isPaired {
+        pairedView
+      } else {
+        unpairedView
+      }
+    }
+    .padding()
+    .sheet(isPresented: $showGenerateSheet) {
+      GenerateCodeSheet(isPresented: $showGenerateSheet)
+    }
+    .sheet(isPresented: $showEnterSheet) {
+      EnterCodeSheet(isPresented: $showEnterSheet)
+    }
+    .alert(isPresented: $showUnpairAlert) {
+      Alert(
+        title: Text("Unpair this device?"),
+        message: Text(
+          "Blue Switch will stop accepting commands from your other Mac until you pair again."
+        ),
+        primaryButton: .destructive(Text("Unpair")) {
+          pairing.unpair()
+        },
+        secondaryButton: .cancel()
+      )
+    }
+  }
+
+  // MARK: - Subviews
+
+  private var unpairedView: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text("Not paired")
+        .font(.title2)
+        .bold()
+      Text("Pair this Mac with another Blue Switch install to enable secure switching.")
+        .foregroundColor(.secondary)
+      HStack {
+        Button("Generate Code") {
+          showGenerateSheet = true
+        }
+        Button("Enter Code") {
+          showEnterSheet = true
+        }
+      }
+      Spacer()
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var pairedView: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text("Paired")
+        .font(.title2)
+        .bold()
+      if let fingerprint = pairing.fingerprint {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Fingerprint")
+            .font(.caption)
+            .foregroundColor(.secondary)
+          Text(fingerprint)
+            .font(.system(.title3, design: .monospaced))
+        }
+      }
+      Text("Verify the same fingerprint appears on your other Mac.")
+        .foregroundColor(.secondary)
+      Button("Unpair") {
+        showUnpairAlert = true
+      }
+      .foregroundColor(.red)
+      Spacer()
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+// MARK: - Generate Code Sheet
+
+private struct GenerateCodeSheet: View {
+  @Binding var isPresented: Bool
+  @ObservedObject private var pairing = PairingStore.shared
+  @State private var code: String = PairingStore.generateCode()
+  @State private var errorMessage: String?
+
+  var body: some View {
+    VStack(spacing: 20) {
+      Text("Pairing Code")
+        .font(.headline)
+      Text(PairingStore.formatCode(code))
+        .font(.system(size: 32, weight: .bold, design: .monospaced))
+      Text("Enter this code on your other Mac.")
+        .foregroundColor(.secondary)
+        .font(.caption)
+      if let error = errorMessage {
+        Text(error)
+          .foregroundColor(.red)
+          .font(.caption)
+      }
+      HStack {
+        Button("Copy") {
+          let pb = NSPasteboard.general
+          pb.clearContents()
+          pb.setString(PairingStore.formatCode(code), forType: .string)
+        }
+        Button("Cancel") {
+          isPresented = false
+        }
+        Button("I've entered this on my other Mac") {
+          do {
+            try pairing.pair(withCode: code)
+            isPresented = false
+          } catch {
+            errorMessage = "Failed to save pairing key."
+          }
+        }
+        .keyboardShortcut(.defaultAction)
+      }
+    }
+    .padding(24)
+    .frame(width: 460)
+  }
+}
+
+// MARK: - Enter Code Sheet
+
+private struct EnterCodeSheet: View {
+  @Binding var isPresented: Bool
+  @ObservedObject private var pairing = PairingStore.shared
+  @State private var input: String = ""
+  @State private var errorMessage: String?
+
+  var body: some View {
+    VStack(spacing: 20) {
+      Text("Enter Pairing Code")
+        .font(.headline)
+      TextField("XXX-XXX-XXX", text: $input)
+        .textFieldStyle(RoundedBorderTextFieldStyle())
+        .font(.system(.title2, design: .monospaced))
+        .onChange(of: input) { newValue in
+          let normalized = PairingStore.normalize(newValue)
+          let limited = String(normalized.prefix(PairingStore.codeLength))
+          let formatted = PairingStore.formatCode(limited)
+          if formatted != newValue {
+            input = formatted
+          }
+        }
+      if let error = errorMessage {
+        Text(error)
+          .foregroundColor(.red)
+          .font(.caption)
+      }
+      HStack {
+        Button("Cancel") {
+          isPresented = false
+        }
+        Button("Pair") {
+          let normalized = PairingStore.normalize(input)
+          guard PairingStore.isValid(normalized) else {
+            errorMessage = "Code must be 9 characters from the pairing alphabet."
+            return
+          }
+          do {
+            try pairing.pair(withCode: normalized)
+            isPresented = false
+          } catch {
+            errorMessage = "Failed to derive or save pairing key."
+          }
+        }
+        .keyboardShortcut(.defaultAction)
+      }
+    }
+    .padding(24)
+    .frame(width: 420)
+  }
+}
+
+// MARK: - Preview
+
+#Preview {
+  PairingSettingsView()
+}

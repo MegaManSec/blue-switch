@@ -29,7 +29,6 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
 
   // MARK: - Dependencies
 
-  private let connectionManager = ConnectionManager()
   private let servicePublisher = ServicePublisher()
   private let serviceBrowser = ServiceBrowser()
 
@@ -87,7 +86,14 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
   }
 
   func connectToNetworkDevice(_ device: NetworkDevice, message: String) {
-    connectionManager.connectToDevice(device, message: message)
+    // Generic free-text "connect" was only used by callers that ultimately
+    // wanted a one-shot command send. Route through executeCommand if it
+    // matches a known command, otherwise log and ignore.
+    if let command = DeviceCommand(rawValue: message) {
+      executeCommand(command) { _ in }
+    } else {
+      print("connectToNetworkDevice: ignoring non-command message")
+    }
   }
 
   func updateNetworkDevice(_ device: NetworkDevice) {
@@ -123,15 +129,11 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
   }
 
   func sendNotification(to device: NetworkDevice) {
-    // Send notification to the device
-    connectionManager.sendNotification(
-      to: device,
-      title: "New Notification",
-      message:
-        "You have a new notification from \(Host.current().localizedName ?? "Unknown Device")"
-    )
+    let title = "New Notification"
+    let body =
+      "You have a new notification from \(Host.current().localizedName ?? "Unknown Device")"
+    sendNotificationOverSecure(to: device, title: title, message: body)
 
-    // Show local notification
     NotificationManager.showNotification(
       title: "Notification Sent",
       body: "Notification sent to \(device.name)"
@@ -198,7 +200,7 @@ extension NetworkDeviceStore {
     }
   }
 
-  /// Executes a command on the connected device
+  /// Executes a command on the first connected device through a secure channel.
   func executeCommand(_ command: DeviceCommand, completion: @escaping (Bool) -> Void) {
     guard let device = networkDevices.first else {
       print("No connected devices found")
@@ -206,55 +208,109 @@ extension NetworkDeviceStore {
       return
     }
 
-    let connection = NWConnection(
-      host: NWEndpoint.Host(device.host),
-      port: NWEndpoint.Port(integerLiteral: UInt16(device.port)),
-      using: .tcp
+    guard PairingStore.shared.isPaired else {
+      print("executeCommand failed: not paired")
+      completion(false)
+      return
+    }
+
+    let outgoing = OutgoingConnection(host: device.host, port: UInt16(device.port))
+    outgoing.run(
+      body: { channel, done in
+        channel.send(Data(command.rawValue.utf8)) { sendErr in
+          if let sendErr = sendErr {
+            print("Failed to send command: \(sendErr)")
+            done(false)
+            return
+          }
+          channel.receive { result in
+            switch result {
+            case .failure(let err):
+              print("Failed to receive response: \(err)")
+              done(false)
+            case .success(let data):
+              let response = String(data: data, encoding: .utf8) ?? ""
+              if let resp = DeviceCommand(rawValue: response) {
+                done(resp == .operationSuccess)
+              } else {
+                done(false)
+              }
+            }
+          }
+        }
+      },
+      completion: completion
     )
+  }
 
-    connection.stateUpdateHandler = { state in
-      switch state {
-      case .ready:
-        // Send command
-        let message = command.rawValue
-        self.connectionManager.send(message: message, to: connection)
-      case .failed(let error):
-        print("Command execution failed: \(error)")
-        completion(false)
-      case .cancelled:
-        completion(false)
-      default:
-        break
-      }
+  /// Sends a notification through a secure channel.
+  func sendNotificationOverSecure(
+    to device: NetworkDevice, title: String, message: String
+  ) {
+    guard PairingStore.shared.isPaired else {
+      print("sendNotification failed: not paired")
+      return
     }
 
-    connection.receiveMessage { data, _, isComplete, error in
-      if let error = error {
-        print("Failed to receive response: \(error)")
-        completion(false)
-        return
-      }
-
-      if let data = data,
-        let response = String(data: data, encoding: .utf8),
-        let responseCommand = DeviceCommand(rawValue: response)
-      {
-        completion(responseCommand == .operationSuccess)
-      } else {
-        completion(false)
-      }
-
-      if isComplete {
-        connection.cancel()
-      }
-    }
-
-    connection.start(queue: .global())
+    let outgoing = OutgoingConnection(host: device.host, port: UInt16(device.port))
+    outgoing.run(
+      body: { channel, done in
+        channel.send(Data(DeviceCommand.notification.rawValue.utf8)) { err in
+          if let err = err {
+            print("Notification command send failed: \(err)")
+            done(false)
+            return
+          }
+          let payload = "\(title)|\(message)"
+          channel.send(Data(payload.utf8)) { err2 in
+            if let err2 = err2 {
+              print("Notification payload send failed: \(err2)")
+              done(false)
+            } else {
+              done(true)
+            }
+          }
+        }
+      },
+      completion: { _ in }
+    )
   }
 }
 
 extension NetworkDeviceStore {
   func sendPeripheralSync(peripherals: [BluetoothPeripheral], to device: NetworkDevice) {
-    connectionManager.sendPeripheralSync(peripherals: peripherals, to: device)
+    guard PairingStore.shared.isPaired else {
+      print("sendPeripheralSync failed: not paired")
+      return
+    }
+
+    guard let data = try? JSONEncoder().encode(peripherals),
+      let jsonString = String(data: data, encoding: .utf8)
+    else {
+      print("sendPeripheralSync: failed to encode peripherals")
+      return
+    }
+
+    let outgoing = OutgoingConnection(host: device.host, port: UInt16(device.port))
+    outgoing.run(
+      body: { channel, done in
+        channel.send(Data(DeviceCommand.syncPeripherals.rawValue.utf8)) { err in
+          if let err = err {
+            print("syncPeripherals command send failed: \(err)")
+            done(false)
+            return
+          }
+          channel.send(Data(jsonString.utf8)) { err2 in
+            if let err2 = err2 {
+              print("syncPeripherals payload send failed: \(err2)")
+              done(false)
+            } else {
+              done(true)
+            }
+          }
+        }
+      },
+      completion: { _ in }
+    )
   }
 }

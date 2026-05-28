@@ -10,6 +10,7 @@ struct SettingsView: View {
     static let devices = (image: "keyboard", text: "Peripheral")
     static let mac = (image: "desktopcomputer", text: "Device")
     static let general = (image: "gearshape.fill", text: "General")
+    static let pairing = (image: "lock.shield", text: "Pairing")
     static let other = (image: "ellipsis.circle", text: "Other")
   }
 
@@ -30,6 +31,11 @@ struct SettingsView: View {
       NetworkDeviceManagementView()
         .tabItem {
           Label(TabItem.mac.text, systemImage: TabItem.mac.image)
+        }
+
+      PairingSettingsView()
+        .tabItem {
+          Label(TabItem.pairing.text, systemImage: TabItem.pairing.image)
         }
 
       OtherSettingsView()

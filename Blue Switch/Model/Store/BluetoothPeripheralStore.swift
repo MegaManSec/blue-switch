@@ -241,6 +241,12 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
   func updatePeripherals(_ newPeripherals: [BluetoothPeripheral]) {
     print("Debug: Starting peripheral update with \(newPeripherals.count) devices")
 
+    // Cap inbound list size; reject larger payloads outright.
+    guard newPeripherals.count <= 64 else {
+      print("Rejecting peripheral sync: list exceeds cap of 64")
+      return
+    }
+
     if !Thread.isMainThread {
       DispatchQueue.main.async { [weak self] in
         self?.updatePeripherals(newPeripherals)

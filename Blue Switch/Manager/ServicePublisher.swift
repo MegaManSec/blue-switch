@@ -19,7 +19,8 @@ final class ServicePublisher: NSObject, NetworkNetworkServicePublishable {
 
   // MARK: - Dependencies
 
-  private let connectionManager = ConnectionManager()
+  private let rateLimiter = RateLimiter()
+  private let pairingStore = PairingStore.shared
 
   // MARK: - Properties
 
@@ -85,8 +86,14 @@ final class ServicePublisher: NSObject, NetworkNetworkServicePublishable {
 
   /// Processes new incoming connections
   private func handleNewConnection(_ connection: NWConnection) {
-    connection.start(queue: queue)
-    connectionManager.receive(on: connection)
+    let handler = IncomingConnection(
+      connection: connection,
+      endpoint: connection.endpoint,
+      rateLimiter: rateLimiter,
+      pairingStore: pairingStore,
+      queue: queue
+    )
+    handler.start()
   }
 
   /// Handles errors that occur during listener setup

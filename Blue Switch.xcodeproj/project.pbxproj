@@ -16,6 +16,12 @@
 		076AB21D2CE9D690004D45F0 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FC2CE9D690004D45F0 /* NotificationManager.swift */; };
 		076AB21E2CE9D690004D45F0 /* ServiceBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FD2CE9D690004D45F0 /* ServiceBrowser.swift */; };
 		076AB21F2CE9D690004D45F0 /* ServicePublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FE2CE9D690004D45F0 /* ServicePublisher.swift */; };
+		0A00001000000000000000B1 /* SecureChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00001000000000000000A1 /* SecureChannel.swift */; };
+		0A00001000000000000000B2 /* PairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00001000000000000000A2 /* PairingStore.swift */; };
+		0A00001000000000000000B3 /* IncomingConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00001000000000000000A3 /* IncomingConnection.swift */; };
+		0A00001000000000000000B4 /* OutgoingConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00001000000000000000A4 /* OutgoingConnection.swift */; };
+		0A00001000000000000000B5 /* RateLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00001000000000000000A5 /* RateLimiter.swift */; };
+		0A00001000000000000000B6 /* PairingSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00001000000000000000A6 /* PairingSettingsView.swift */; };
 		076AB2202CE9D690004D45F0 /* BluetoothPeripheral.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB2002CE9D690004D45F0 /* BluetoothPeripheral.swift */; };
 		076AB2212CE9D690004D45F0 /* NetworkDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB2012CE9D690004D45F0 /* NetworkDevice.swift */; };
 		076AB2222CE9D690004D45F0 /* BluetoothPeripheralStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB2032CE9D690004D45F0 /* BluetoothPeripheralStore.swift */; };
@@ -57,6 +63,12 @@
 		076AB1FC2CE9D690004D45F0 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		076AB1FD2CE9D690004D45F0 /* ServiceBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceBrowser.swift; sourceTree = "<group>"; };
 		076AB1FE2CE9D690004D45F0 /* ServicePublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicePublisher.swift; sourceTree = "<group>"; };
+		0A00001000000000000000A1 /* SecureChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureChannel.swift; sourceTree = "<group>"; };
+		0A00001000000000000000A2 /* PairingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingStore.swift; sourceTree = "<group>"; };
+		0A00001000000000000000A3 /* IncomingConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomingConnection.swift; sourceTree = "<group>"; };
+		0A00001000000000000000A4 /* OutgoingConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutgoingConnection.swift; sourceTree = "<group>"; };
+		0A00001000000000000000A5 /* RateLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateLimiter.swift; sourceTree = "<group>"; };
+		0A00001000000000000000A6 /* PairingSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingSettingsView.swift; sourceTree = "<group>"; };
 		076AB2002CE9D690004D45F0 /* BluetoothPeripheral.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothPeripheral.swift; sourceTree = "<group>"; };
 		076AB2012CE9D690004D45F0 /* NetworkDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkDevice.swift; sourceTree = "<group>"; };
 		076AB2032CE9D690004D45F0 /* BluetoothPeripheralStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothPeripheralStore.swift; sourceTree = "<group>"; };
@@ -126,6 +138,11 @@
 				076AB1FC2CE9D690004D45F0 /* NotificationManager.swift */,
 				076AB1FD2CE9D690004D45F0 /* ServiceBrowser.swift */,
 				076AB1FE2CE9D690004D45F0 /* ServicePublisher.swift */,
+				0A00001000000000000000A1 /* SecureChannel.swift */,
+				0A00001000000000000000A2 /* PairingStore.swift */,
+				0A00001000000000000000A3 /* IncomingConnection.swift */,
+				0A00001000000000000000A4 /* OutgoingConnection.swift */,
+				0A00001000000000000000A5 /* RateLimiter.swift */,
 			);
 			path = Manager;
 			sourceTree = "<group>";
@@ -180,6 +197,7 @@
 				076AB20E2CE9D690004D45F0 /* NetworkDeviceManagementView.swift */,
 				076AB20F2CE9D690004D45F0 /* OtherSettingsView.swift */,
 				076AB2102CE9D690004D45F0 /* SettingsView.swift */,
+				0A00001000000000000000A6 /* PairingSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -375,6 +393,12 @@
 				076AB21D2CE9D690004D45F0 /* NotificationManager.swift in Sources */,
 				076AB21E2CE9D690004D45F0 /* ServiceBrowser.swift in Sources */,
 				076AB21F2CE9D690004D45F0 /* ServicePublisher.swift in Sources */,
+				0A00001000000000000000B1 /* SecureChannel.swift in Sources */,
+				0A00001000000000000000B2 /* PairingStore.swift in Sources */,
+				0A00001000000000000000B3 /* IncomingConnection.swift in Sources */,
+				0A00001000000000000000B4 /* OutgoingConnection.swift in Sources */,
+				0A00001000000000000000B5 /* RateLimiter.swift in Sources */,
+				0A00001000000000000000B6 /* PairingSettingsView.swift in Sources */,
 				076AB2202CE9D690004D45F0 /* BluetoothPeripheral.swift in Sources */,
 				076AB2212CE9D690004D45F0 /* NetworkDevice.swift in Sources */,
 				076AB2222CE9D690004D45F0 /* BluetoothPeripheralStore.swift in Sources */,

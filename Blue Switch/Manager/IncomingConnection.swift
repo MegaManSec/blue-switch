@@ -1,0 +1,257 @@
+import Foundation
+import Network
+
+/// Per-accept handler. Owns the NWConnection, its SecureChannel, idle/total
+/// timers, and the (per-connection) decoder state. Self-retained until the
+/// connection terminates so it doesn't get released mid-flight.
+final class IncomingConnection {
+  // MARK: - Constants
+
+  private static let idleTimeout: TimeInterval = 30
+  private static let totalBudget: TimeInterval = 5 * 60
+
+  // MARK: - Dependencies
+
+  private let connection: NWConnection
+  private let endpoint: NWEndpoint?
+  private let rateLimiter: RateLimiter
+  private let pairingStore: PairingStore
+  private let queue: DispatchQueue
+  private let bluetoothStore = BluetoothPeripheralStore.shared
+
+  // MARK: - State
+
+  private var channel: SecureChannel?
+  private var lastReceivedCommand: DeviceCommand?
+  private var idleTimer: DispatchSourceTimer?
+  private var totalTimer: DispatchSourceTimer?
+  private var selfRef: IncomingConnection?
+  private var authenticated = false
+  private var finished = false
+
+  // MARK: - Init
+
+  init(
+    connection: NWConnection,
+    endpoint: NWEndpoint?,
+    rateLimiter: RateLimiter,
+    pairingStore: PairingStore,
+    queue: DispatchQueue
+  ) {
+    self.connection = connection
+    self.endpoint = endpoint
+    self.rateLimiter = rateLimiter
+    self.pairingStore = pairingStore
+    self.queue = queue
+  }
+
+  // MARK: - Lifecycle
+
+  func start() {
+    selfRef = self
+
+    guard rateLimiter.shouldAccept(endpoint: endpoint) else {
+      print("Rejecting connection from blocked endpoint")
+      connection.cancel()
+      release()
+      return
+    }
+
+    guard let psk = pairingStore.currentKey() else {
+      print("Rejecting connection: not paired")
+      connection.cancel()
+      release()
+      return
+    }
+
+    let channel = SecureChannel(
+      connection: connection, role: .server, psk: psk, queue: queue
+    )
+    self.channel = channel
+
+    connection.stateUpdateHandler = { [weak self] state in
+      guard let self = self else { return }
+      switch state {
+      case .failed, .cancelled:
+        self.teardown()
+      default:
+        break
+      }
+    }
+    connection.start(queue: queue)
+
+    startTotalTimer()
+    resetIdleTimer()
+
+    channel.performHandshake { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .success:
+        self.authenticated = true
+        self.resetIdleTimer()
+        self.readNext()
+      case .failure(let error):
+        print("Handshake failed: \(error)")
+        self.rateLimiter.recordFailure(endpoint: self.endpoint)
+        self.teardown()
+      }
+    }
+  }
+
+  // MARK: - Read Loop
+
+  private func readNext() {
+    guard let channel = channel else { return }
+    channel.receive { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .failure(let error):
+        switch error {
+        case .connectionClosed:
+          break
+        default:
+          self.rateLimiter.recordFailure(endpoint: self.endpoint)
+        }
+        self.teardown()
+      case .success(let data):
+        self.resetIdleTimer()
+        self.handleIncoming(data: data)
+        self.readNext()
+      }
+    }
+  }
+
+  // MARK: - Command Handling
+
+  private func handleIncoming(data: Data) {
+    guard let message = String(data: data, encoding: .utf8) else {
+      print("Dropping non-UTF8 frame")
+      return
+    }
+    if let command = DeviceCommand(rawValue: message) {
+      handleCommand(command)
+    } else if let last = lastReceivedCommand {
+      handleCommandData(message, for: last)
+    } else {
+      print("Unexpected payload with no pending command")
+    }
+  }
+
+  private func handleCommand(_ command: DeviceCommand) {
+    lastReceivedCommand = command
+    switch command {
+    case .notification, .syncPeripherals:
+      break
+    case .connectAll:
+      bluetoothStore.peripherals.forEach { peripheral in
+        bluetoothStore.connectPeripheral(peripheral)
+      }
+      sendString(DeviceCommand.operationSuccess.rawValue)
+      lastReceivedCommand = nil
+    case .unregisterAll:
+      bluetoothStore.peripherals.forEach { peripheral in
+        bluetoothStore.unregisterFromPC(peripheral)
+      }
+      sendString(DeviceCommand.operationSuccess.rawValue)
+      lastReceivedCommand = nil
+    default:
+      print("Unsupported command: \(command.rawValue)")
+      sendString(DeviceCommand.operationFailed.rawValue)
+      lastReceivedCommand = nil
+    }
+  }
+
+  private func handleCommandData(_ message: String, for command: DeviceCommand) {
+    switch command {
+    case .notification:
+      let components = message.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+      if components.count == 2 {
+        NotificationManager.showNotification(
+          title: String(components[0]),
+          body: String(components[1])
+        )
+      } else {
+        print("Invalid notification format received")
+      }
+    case .syncPeripherals:
+      guard let data = message.data(using: .utf8) else {
+        print("syncPeripherals: invalid utf8")
+        rateLimiter.recordFailure(endpoint: endpoint)
+        teardown()
+        return
+      }
+      do {
+        let peripherals = try JSONDecoder().decode([BluetoothPeripheral].self, from: data)
+        bluetoothStore.updatePeripherals(peripherals)
+        sendString(DeviceCommand.operationSuccess.rawValue)
+      } catch {
+        print("syncPeripherals decode failed: \(error)")
+        rateLimiter.recordFailure(endpoint: endpoint)
+        sendString(DeviceCommand.operationFailed.rawValue)
+        teardown()
+        return
+      }
+    default:
+      break
+    }
+    lastReceivedCommand = nil
+  }
+
+  // MARK: - Sending
+
+  private func sendString(_ message: String) {
+    guard let channel = channel else { return }
+    channel.send(Data(message.utf8)) { error in
+      if let error = error {
+        print("Sealed send failed: \(error)")
+      }
+    }
+  }
+
+  // MARK: - Timers
+
+  private func resetIdleTimer() {
+    idleTimer?.cancel()
+    let timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now() + Self.idleTimeout)
+    timer.setEventHandler { [weak self] in
+      guard let self = self else { return }
+      if !self.authenticated {
+        self.rateLimiter.recordFailure(endpoint: self.endpoint)
+      }
+      self.teardown()
+    }
+    timer.resume()
+    idleTimer = timer
+  }
+
+  private func startTotalTimer() {
+    let timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now() + Self.totalBudget)
+    timer.setEventHandler { [weak self] in
+      self?.teardown()
+    }
+    timer.resume()
+    totalTimer = timer
+  }
+
+  // MARK: - Teardown
+
+  private func teardown() {
+    guard !finished else { return }
+    finished = true
+    idleTimer?.cancel()
+    totalTimer?.cancel()
+    idleTimer = nil
+    totalTimer = nil
+    channel?.cancel()
+    connection.cancel()
+    release()
+  }
+
+  private func release() {
+    queue.async { [weak self] in
+      self?.selfRef = nil
+    }
+  }
+}
