@@ -5,9 +5,10 @@ import Foundation
 ///
 /// Magic Switch ships via semantic-release, which publishes one GitHub Release
 /// per `vX.Y.Z` tag, so `releases/latest` is the canonical "newest stable
-/// version" — a single unauthenticated request, no pagination. The check is
-/// silent: any network/parse failure leaves the last known state untouched and
-/// is never surfaced to the user. An hourly timer re-evaluates a 24h gate
+/// version" — a single unauthenticated request, no pagination. Automatic
+/// checks are silent (a network/parse failure leaves the last known state
+/// untouched); a manual check — the Check-for-Updates button — surfaces its
+/// result. An hourly timer re-evaluates a 24h gate
 /// (both persisted in `UserDefaults`), so the network is hit at most once per
 /// day, while a transient failure — which doesn't advance the gate — is retried
 /// on the next tick instead of waiting for a relaunch. Results drive the
@@ -55,9 +56,14 @@ final class UpdateChecker: ObservableObject {
   /// malformed; callers guard on it.
   let releasePageURL = URL(string: Constants.latestReleasePage)
 
-  /// Guards against overlapping in-flight checks within a session (e.g. the
-  /// user reopening Settings repeatedly). Main-thread only.
-  private var isChecking = false
+  /// True while a check is in flight; drives the "Checking…" state on the
+  /// manual Check-for-Updates button, and guards against overlapping checks.
+  /// Main-thread only.
+  @Published private(set) var isChecking = false
+
+  /// Set when a *manual* check fails to reach GitHub, so the button can say so.
+  /// Automatic checks stay silent. Main-thread only.
+  @Published private(set) var lastCheckFailed = false
 
   /// Hourly poll, retained for the singleton's lifetime, so a long-running app
   /// re-checks (and retries failures) without needing a relaunch.
@@ -106,7 +112,6 @@ final class UpdateChecker: ObservableObject {
   /// asynchronously on success. Called on the main thread from app launch, the
   /// Settings `onAppear`, and the hourly `pollTimer`.
   func checkIfNeeded() {
-    guard !isChecking else { return }
     if let last = UserDefaults.standard.object(forKey: Constants.lastCheckedKey) as? Date,
       Date().timeIntervalSince(last) < Constants.checkInterval
     {
@@ -115,44 +120,64 @@ final class UpdateChecker: ObservableObject {
     check()
   }
 
+  /// Force a check now, ignoring the 24h cadence — the manual "Check for
+  /// Updates" button. Runs in Debug too (it's an explicit user action, not an
+  /// auto-nag), so the button works in every build.
+  func checkNow() {
+    performCheck(manual: true)
+  }
+
   // MARK: - Private Methods
 
+  /// Automatic check — suppressed in Debug so a dev build (version "0.0.0")
+  /// doesn't nag that every release is newer. Mirrors exodus-deps-tui skipping
+  /// the check when run from a source checkout.
   private func check() {
     #if DEBUG
-      // Don't nag during development — a dev build's version is the "0.0.0"
-      // placeholder, so every release would look newer. Mirrors
-      // exodus-deps-tui suppressing the check when run from a source checkout.
       return
     #else
-      guard let url = URL(string: Constants.latestReleaseAPI) else { return }
-      isChecking = true
-
-      var request = URLRequest(url: url)
-      request.timeoutInterval = Constants.requestTimeout
-      request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-      request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-      request.setValue(Constants.userAgent, forHTTPHeaderField: "User-Agent")
-
-      URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
-        let version: String? = {
-          guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-            let data = data, let tag = Self.parseTagName(from: data)
-          else { return nil }
-          return Self.normalize(tag)
-        }()
-
-        DispatchQueue.main.async {
-          guard let self = self else { return }
-          self.isChecking = false
-          // Only record success: a transient failure shouldn't suppress the
-          // next launch's retry for a full 24h.
-          guard let version = version else { return }
-          UserDefaults.standard.set(Date(), forKey: Constants.lastCheckedKey)
-          UserDefaults.standard.set(version, forKey: Constants.latestVersionKey)
-          self.latestVersion = version
-        }
-      }.resume()
+      performCheck(manual: false)
     #endif
+  }
+
+  /// The actual network fetch. A `manual` check surfaces success/failure on the
+  /// button; automatic ones stay silent. One in-flight request at a time.
+  private func performCheck(manual: Bool) {
+    guard !isChecking else { return }
+    guard let url = URL(string: Constants.latestReleaseAPI) else { return }
+    isChecking = true
+    if manual { lastCheckFailed = false }
+
+    var request = URLRequest(url: url)
+    request.timeoutInterval = Constants.requestTimeout
+    request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+    request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+    request.setValue(Constants.userAgent, forHTTPHeaderField: "User-Agent")
+
+    URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
+      let version: String? = {
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+          let data = data, let tag = Self.parseTagName(from: data)
+        else { return nil }
+        return Self.normalize(tag)
+      }()
+
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        self.isChecking = false
+        guard let version = version else {
+          // Only a manual check surfaces the failure; auto checks stay silent
+          // and just retry on the next hourly tick.
+          if manual { self.lastCheckFailed = true }
+          return
+        }
+        // Only record success: a transient failure shouldn't suppress the
+        // next launch's retry for a full 24h.
+        UserDefaults.standard.set(Date(), forKey: Constants.lastCheckedKey)
+        UserDefaults.standard.set(version, forKey: Constants.latestVersionKey)
+        self.latestVersion = version
+      }
+    }.resume()
   }
 
   /// Pull `tag_name` out of the `releases/latest` JSON without a model type.

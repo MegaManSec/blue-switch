@@ -43,6 +43,25 @@ struct OtherSettingsView: View {
           Text(updateChecker.currentVersion)
             .foregroundColor(.secondary)
         }
+        HStack {
+          Button {
+            updateChecker.checkNow()
+          } label: {
+            if updateChecker.isChecking {
+              HStack(spacing: 6) {
+                ProgressView()
+                  .controlSize(.small)
+                Text("Checking…")
+              }
+            } else {
+              Text("Check for Updates")
+            }
+          }
+          .disabled(updateChecker.isChecking)
+          .help("Check GitHub for a newer release right now.")
+          Spacer()
+          updateStatus
+        }
       }
     }
     .onAppear(perform: refreshOnAppear)
@@ -55,6 +74,24 @@ struct OtherSettingsView: View {
     } else {
       formContent
         .padding()
+    }
+  }
+
+  /// Trailing status beside the Check-for-Updates button. The "Update
+  /// Available" row already covers the positive case, so this only reports a
+  /// failed manual check or an up-to-date result.
+  @ViewBuilder
+  private var updateStatus: some View {
+    if updateChecker.lastCheckFailed {
+      Text("Couldn't check")
+        .font(.caption)
+        .foregroundColor(.red)
+    } else if !updateChecker.isChecking, !updateChecker.updateAvailable,
+      updateChecker.latestVersion != nil
+    {
+      Text("Up to date")
+        .font(.caption)
+        .foregroundColor(.secondary)
     }
   }
 

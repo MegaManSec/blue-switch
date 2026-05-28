@@ -28,33 +28,33 @@ struct SettingsView: View {
       BluetoothPeripheralSettingsView()
         .tabItem {
           Label(TabItem.devices.text, systemImage: TabItem.devices.image)
+            .help(
+              "Pick which paired Bluetooth peripherals Magic Switch should manage. Pair them in System Settings → Bluetooth first; this tab just selects from those."
+            )
         }
-        .help(
-          "Pick which paired Bluetooth peripherals Magic Switch should manage. Pair them in System Settings → Bluetooth first; this tab just selects from those."
-        )
         .tag(0)
 
       NetworkDeviceManagementView()
         .tabItem {
           Label(TabItem.mac.text, systemImage: TabItem.mac.image)
+            .help("The other Mac you're switching with. Discovered on the local network.")
         }
-        .help("The other Mac you're switching with. Discovered on the local network.")
         .tag(1)
 
       PairingSettingsView()
         .tabItem {
           Label(TabItem.pairing.text, systemImage: TabItem.pairing.image)
+            .help(
+              "Cryptographic shared key with the other Mac. Required by Magic Switch — separate from the System Settings → Bluetooth pairing of your peripherals."
+            )
         }
-        .help(
-          "Cryptographic shared key with the other Mac. Required by Magic Switch — separate from the System Settings → Bluetooth pairing of your peripherals."
-        )
         .tag(2)
 
       OtherSettingsView()
         .tabItem {
           Label(TabItem.other.text, systemImage: TabItem.other.image)
+            .help("License and other settings.")
         }
-        .help("License and other settings.")
         .tag(3)
     }
     .frame(width: windowSize.width, height: windowSize.height)
