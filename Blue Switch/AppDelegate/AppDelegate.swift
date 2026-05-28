@@ -1,7 +1,6 @@
 import Cocoa
 import Combine
 import CoreBluetooth
-import SwiftUI
 
 /// Application delegate handling lifecycle and UI setup
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -13,14 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   // MARK: - UI Components
 
   private var statusItem: NSStatusItem!
-  private var settingsWindowController: NSWindowController?
   private var bluetoothStateObserver: AnyCancellable?
   private var pairingObserver: AnyCancellable?
   private var lastBluetoothState: CBManagerState = .unknown
-
-  // MARK: - Constants
-
-  private let windowSize = NSSize(width: 480, height: 300)
 
   // MARK: - Lifecycle Methods
 
@@ -276,29 +270,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   // MARK: - Settings Management
 
-  @objc func openPreferencesWindow() {
-    if settingsWindowController == nil {
-      let settingsWindow = createSettingsWindow()
-      settingsWindowController = NSWindowController(window: settingsWindow)
-    }
-
+  /// Open the SwiftUI `Settings` scene declared in `Blue_SwitchApp`. The
+  /// previous code hosted `SettingsView` inside a manually-built `NSWindow`,
+  /// which suppresses SwiftUI `.help(...)` tooltips; routing through the
+  /// `Settings` scene fixes that.
+  @objc func openSettingsWindow(_ sender: Any?) {
     NSApp.activate(ignoringOtherApps: true)
-    settingsWindowController?.showWindow(nil)
-    settingsWindowController?.window?.orderFrontRegardless()
-  }
-
-  private func createSettingsWindow() -> NSWindow {
-    let window = NSWindow(
-      contentRect: NSRect(origin: .zero, size: windowSize),
-      styleMask: [.titled, .closable],
-      backing: .buffered,
-      defer: false
-    )
-
-    window.center()
-    window.title = "Settings"
-    window.contentView = NSHostingView(rootView: SettingsView())
-
-    return window
+    // macOS 13 renamed the standard selector; fall back for older releases.
+    let modern = Selector(("showSettingsWindow:"))
+    let legacy = Selector(("showPreferencesWindow:"))
+    if !NSApp.sendAction(modern, to: nil, from: nil) {
+      NSApp.sendAction(legacy, to: nil, from: nil)
+    }
   }
 }

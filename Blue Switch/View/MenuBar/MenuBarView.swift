@@ -70,7 +70,7 @@ final class MenuBarView: MenuBarPresentable {
       makeItem(
         title: Constants.Menu.settings,
         symbol: Constants.Symbols.settings,
-        action: #selector(AppDelegate.openPreferencesWindow),
+        action: #selector(AppDelegate.openSettingsWindow(_:)),
         keyEquivalent: Constants.KeyEquivalents.settings))
 
     menu.addItem(
