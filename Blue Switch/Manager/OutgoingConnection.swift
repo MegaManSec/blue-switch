@@ -41,6 +41,12 @@ final class OutgoingConnection {
   // MARK: - Constants
 
   private static let connectionTimeout: TimeInterval = 5
+  /// Upper bound on `body` execution after the handshake completes.
+  /// Receivers that don't respond (or peers that don't recognize a newer
+  /// opcode and don't reply OP_FAILED — i.e. anything older than the
+  /// commit that added the default-case ack) would otherwise hang here
+  /// until the peer's own idle timer (~30s) closes the socket.
+  private static let bodyTimeout: TimeInterval = 5
 
   // MARK: - State
 
@@ -51,6 +57,7 @@ final class OutgoingConnection {
   private var selfRef: OutgoingConnection?
   private var finished = false
   private var connectTimer: DispatchSourceTimer?
+  private var bodyTimer: DispatchSourceTimer?
 
   // MARK: - Init
 
@@ -111,6 +118,7 @@ final class OutgoingConnection {
           case .success:
             self.connectTimer?.cancel()
             self.connectTimer = nil
+            self.startBodyTimer(completion: completion)
             body(channel) { ok in
               self.finish(
                 ok ? .success(()) : .failure(.bodyFailed), completion: completion)
@@ -145,10 +153,25 @@ final class OutgoingConnection {
     finished = true
     connectTimer?.cancel()
     connectTimer = nil
+    bodyTimer?.cancel()
+    bodyTimer = nil
     channel?.cancel()
     connection.cancel()
     completion(result)
     release()
+  }
+
+  private func startBodyTimer(
+    completion: @escaping (Result<Void, OutgoingFailure>) -> Void
+  ) {
+    let timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now() + Self.bodyTimeout)
+    timer.setEventHandler { [weak self] in
+      guard let self = self else { return }
+      self.finish(.failure(.bodyFailed), completion: completion)
+    }
+    timer.resume()
+    bodyTimer = timer
   }
 
   private func release() {
