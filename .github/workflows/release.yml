@@ -13,8 +13,11 @@ permissions: {}
 jobs:
   version:
     runs-on: ubuntu-latest
+    # semantic-release --dry-run still calls `git push --dry-run` to validate
+    # push credentials, which GitHub's git server rejects with 403 unless the
+    # minted token has write scope. No actual push happens (--dry-run is honored).
     permissions:
-      contents: read
+      contents: write
 
     outputs:
       new-release-version: ${{ steps.determine_version.outputs.new-release-version }}
@@ -55,6 +58,8 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: read
+      id-token: write # OIDC token for Sigstore signing
+      attestations: write # publish SLSA build provenance
     outputs:
       zip-path: ${{ steps.create_zip.outputs.zip-path }}
     steps:
@@ -91,6 +96,11 @@ jobs:
           cd "Blue Switch.xcarchive/Products/Applications"
           ditto -c -k --sequesterRsrc --keepParent "Blue Switch.app" "../../../Blue Switch.app.zip"
           echo "zip-path=$(realpath "../../../Blue Switch.app.zip")" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: "Blue Switch.app.zip"
 
       - name: Prepare artifacts
         run: |
