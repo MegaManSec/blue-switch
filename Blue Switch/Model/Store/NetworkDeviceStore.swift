@@ -15,8 +15,6 @@ protocol NetworkDeviceManageable {
   func registerNetworkDevice(device: NetworkDevice)
   /// Removes a registered network device
   func removeNetworkDevice(device: NetworkDevice)
-  /// Establishes connection to a network device
-  func connectToNetworkDevice(_ device: NetworkDevice, message: String)
   /// Updates the information of a network device
   func updateNetworkDevice(_ device: NetworkDevice)
 }
@@ -83,17 +81,6 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
   func removeNetworkDevice(device: NetworkDevice) {
     networkDevices.removeAll { $0.id == device.id }
     saveNetworkDevices()
-  }
-
-  func connectToNetworkDevice(_ device: NetworkDevice, message: String) {
-    // Generic free-text "connect" was only used by callers that ultimately
-    // wanted a one-shot command send. Route through executeCommand if it
-    // matches a known command, otherwise log and ignore.
-    if let command = DeviceCommand(rawValue: message) {
-      executeCommand(command) { _ in }
-    } else {
-      print("connectToNetworkDevice: ignoring non-command message")
-    }
   }
 
   func updateNetworkDevice(_ device: NetworkDevice) {
@@ -166,14 +153,12 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
 
 /// Represents different types of device commands
 enum DeviceCommand: String, Codable {
-  case healthCheck = "HEALTH_CHECK"
   case unregisterAll = "UNREGISTER_ALL"
   case connectAll = "CONNECT_ALL"
   case operationSuccess = "OP_SUCCESS"
   case operationFailed = "OP_FAILED"
   case notification = "NOTIFICATION"
   case syncPeripherals = "SYNC_PERIPHERALS"
-  case peripheralData = "PERIPHERAL_DATA"
 }
 
 // MARK: - Health Check Extension

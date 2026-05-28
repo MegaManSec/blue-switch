@@ -4,9 +4,6 @@ import SwiftUI
 struct OtherSettingsView: View {
   // MARK: - Properties
 
-  @State private var showAlert = false
-  @State private var showSheet = false
-
   @Environment(\.openURL) private var openURL
 
   // MARK: - View Content
@@ -33,7 +30,9 @@ struct OtherSettingsView: View {
   // MARK: - Private Methods
 
   private func showLicenseInfo() {
-    openURL(URL(string: "https://github.com/MegaManSec/blue-switch/blob/main/LICENSE")!)
+    guard let url = URL(string: "https://github.com/MegaManSec/blue-switch/blob/main/LICENSE")
+    else { return }
+    openURL(url)
   }
 }
 

@@ -3,18 +3,26 @@ import Network
 
 /// Per-IP failure tracker. Five failures within a 60s window block the IP for
 /// 15 minutes; blocked endpoints are rejected before any handshake work.
+/// Blocks persist to UserDefaults so a process restart can't reset the counter.
 final class RateLimiter {
   // MARK: - Constants
 
   private static let windowSeconds: TimeInterval = 60
   private static let failureThreshold = 5
   private static let blockDuration: TimeInterval = 15 * 60
+  private static let blocksKey = "com.blueswitch.ratelimiter.blocks"
 
   // MARK: - State
 
   private let queue = DispatchQueue(label: "com.blueswitch.ratelimiter")
   private var failuresByIP: [String: [Date]] = [:]
   private var blocksByIP: [String: Date] = [:]
+
+  // MARK: - Init
+
+  init() {
+    blocksByIP = Self.loadBlocks()
+  }
 
   // MARK: - Public API
 
@@ -30,7 +38,7 @@ final class RateLimiter {
     }
   }
 
-  /// Record an authentication / framing failure for `endpoint`.
+  /// Record an authentication failure for `endpoint`.
   func recordFailure(endpoint: NWEndpoint?) {
     let key = Self.bucket(for: endpoint)
     queue.sync {
@@ -42,8 +50,26 @@ final class RateLimiter {
       if list.count >= Self.failureThreshold {
         blocksByIP[key] = now.addingTimeInterval(Self.blockDuration)
         failuresByIP[key] = []
+        Self.saveBlocks(blocksByIP)
       }
     }
+  }
+
+  // MARK: - Persistence
+
+  private static func loadBlocks() -> [String: Date] {
+    guard let data = UserDefaults.standard.data(forKey: blocksKey),
+      let dict = try? JSONDecoder().decode([String: Date].self, from: data)
+    else { return [:] }
+    let now = Date()
+    return dict.filter { $0.value > now }
+  }
+
+  private static func saveBlocks(_ blocks: [String: Date]) {
+    let now = Date()
+    let pruned = blocks.filter { $0.value > now }
+    guard let data = try? JSONEncoder().encode(pruned) else { return }
+    UserDefaults.standard.set(data, forKey: blocksKey)
   }
 
   // MARK: - Helpers
@@ -52,6 +78,7 @@ final class RateLimiter {
     let now = Date()
     if let until = blocksByIP[key], until <= now {
       blocksByIP.removeValue(forKey: key)
+      Self.saveBlocks(blocksByIP)
     }
     if var list = failuresByIP[key] {
       list = list.filter { $0 > now.addingTimeInterval(-Self.windowSeconds) }
@@ -63,20 +90,35 @@ final class RateLimiter {
     }
   }
 
-  /// Extracts a stable per-IP key. Strips IPv6 scope ids. Falls back to the
-  /// full endpoint string for non-hostPort cases (still per-IP, just preserved
-  /// verbatim instead of fail-open).
+  /// Canonicalizes an endpoint to a single per-IP key. IPv4-mapped IPv6
+  /// addresses (`::ffff:1.2.3.4`) collapse to their IPv4 form so an attacker
+  /// cannot get two failure budgets by alternating stacks. IPv6 scope
+  /// suffixes (`%enX`) are stripped.
   private static func bucket(for endpoint: NWEndpoint?) -> String {
     guard let endpoint = endpoint else { return "unknown" }
-    switch endpoint {
-    case .hostPort(let host, _):
-      let raw = host.debugDescription
+    guard case .hostPort(let host, _) = endpoint else { return "unknown" }
+    switch host {
+    case .ipv4(let addr):
+      return addr.debugDescription
+    case .ipv6(let addr):
+      let raw = addr.debugDescription
+      let stripped: String
       if let pct = raw.firstIndex(of: "%") {
-        return String(raw[..<pct])
+        stripped = String(raw[..<pct])
+      } else {
+        stripped = raw
       }
-      return raw
-    default:
-      return "\(endpoint)"
+      if stripped.lowercased().hasPrefix("::ffff:") {
+        let v4 = String(stripped.dropFirst("::ffff:".count))
+        if v4.split(separator: ".").count == 4 {
+          return v4
+        }
+      }
+      return stripped
+    case .name(let name, _):
+      return name
+    @unknown default:
+      return "unknown"
     }
   }
 }

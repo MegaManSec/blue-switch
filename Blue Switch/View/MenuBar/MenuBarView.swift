@@ -21,8 +21,8 @@ final class MenuBarView: MenuBarPresentable {
 
   // MARK: - Dependencies
 
-  @ObservedObject private var networkStore = NetworkDeviceStore.shared
-  @ObservedObject private var bluetoothStore = BluetoothPeripheralStore.shared
+  private let networkStore = NetworkDeviceStore.shared
+  private let bluetoothStore = BluetoothPeripheralStore.shared
 
   // MARK: - Public Methods
 

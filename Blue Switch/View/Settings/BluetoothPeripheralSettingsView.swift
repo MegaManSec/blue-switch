@@ -6,18 +6,6 @@ struct BluetoothPeripheralSettingsView: View {
 
   @StateObject private var bluetoothStore = BluetoothPeripheralStore.shared
 
-  // MARK: - Constants
-
-  private enum Strings {
-    static let removeAll = "Remove All"
-    static let noRegistered = "No registered peripherals"
-    static let noAvailable = "No available peripherals found"
-    static let addDevice = "Add Device"
-    static let removeFromPC = "Remove from PC"
-    static let connectToPC = "Connect to PC"
-    static let removeDevice = "Remove Device"
-  }
-
   // MARK: - View Content
 
   private var content: some View {
