@@ -183,8 +183,13 @@ final class IncomingConnection {
           title: String(components[0]),
           body: String(components[1])
         )
+        // Ack before the sender tears down the connection. Without this,
+        // `NWConnection.cancel()` on the sender side can drop the in-flight
+        // payload before TCP delivers it.
+        sendString(DeviceCommand.operationSuccess.rawValue)
       } else {
         print("Invalid notification format received")
+        sendString(DeviceCommand.operationFailed.rawValue)
       }
     case .syncPeripherals:
       guard let data = message.data(using: .utf8) else {

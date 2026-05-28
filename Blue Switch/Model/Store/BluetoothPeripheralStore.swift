@@ -28,6 +28,12 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
   private enum Constants {
     static let queueLabel = "com.blueswitch.bluetooth"
     static let invalidRSSI = 127
+    /// Upper bound on how long `connectPeripheral` will leave the UI showing
+    /// "Pairing…" before giving up. Magic peripherals typically pair within
+    /// a couple of seconds; if the device is currently held by the other
+    /// Mac, `IOBluetoothDevicePair.start()` has no built-in timeout and the
+    /// state would otherwise stick forever.
+    static let pairTimeout: TimeInterval = 20
   }
 
   // MARK: - Dependencies
@@ -57,6 +63,11 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
 
   /// Disconnect notification observers, keyed by peripheral id.
   private var disconnectObservers: [String: IOBluetoothUserNotification] = [:]
+
+  /// Watchdog timers for in-flight pair attempts, keyed by peripheral id.
+  /// If the pair callback hasn't fired by `Constants.pairTimeout`, the
+  /// timer flips the peripheral back to `.disconnected` so the UI unsticks.
+  private var pairTimers: [String: DispatchSourceTimer] = [:]
 
   // MARK: - Computed Properties
 
@@ -121,8 +132,51 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
     print("\(peripheral.name) has been removed from the list")
   }
 
+  /// Per-peripheral entry point used by the Peripheral tab. Mirrors the
+  /// menu-bar switch choreography (see `AppDelegate.handleSwitchAction`'s
+  /// `.allDisconnected` branch): if there's a paired peer holding our
+  /// peripherals, ask it to release them before we try to pair locally.
+  /// Apple's Magic devices only honor one host at a time, so without this
+  /// step `IOBluetoothDevicePair.start()` just hangs (and the watchdog
+  /// would have to time it out).
+  ///
+  /// Note that we send `UNREGISTER_ALL`, not a per-peripheral release,
+  /// because the wire protocol has no per-peripheral unregister opcode.
+  /// Other peripherals on the peer get released too — same semantics as
+  /// the menu-bar switch.
+  func connectPeripheralCoordinated(_ peripheral: BluetoothPeripheral) {
+    let networkStore = NetworkDeviceStore.shared
+    guard let device = networkStore.networkDevices.first,
+      PairingStore.shared.isPaired,
+      device.isActive
+    else {
+      // No peer to coordinate with — just pair locally.
+      connectPeripheral(peripheral)
+      return
+    }
+
+    setConnectionState(.connecting, for: peripheral.id)
+    schedulePairWatchdog(for: peripheral)
+    networkStore.executeCommand(.unregisterAll) { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .success:
+        self.connectPeripheral(peripheral)
+      case .failure(let err):
+        self.setConnectionState(.disconnected, for: peripheral.id)
+        NotificationManager.showNotification(
+          title: "Couldn't Switch",
+          body:
+            "Couldn't ask \(device.name) to release \(peripheral.name): \(err.userMessage)",
+          identifier: "coord-connect-failed-\(peripheral.id)"
+        )
+      }
+    }
+  }
+
   func connectPeripheral(_ peripheral: BluetoothPeripheral) {
     setConnectionState(.connecting, for: peripheral.id)
+    schedulePairWatchdog(for: peripheral)
 
     bluetoothQueue.async { [weak self] in
       guard let self = self else { return }
@@ -210,8 +264,7 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
           return
         }
 
-        let registeredSet = Set(registeredIDs)
-        var available: [BluetoothPeripheral] = []
+        var paired: [BluetoothPeripheral] = []
         var connectedAddresses: Set<String> = []
 
         for device in pairedDevices {
@@ -219,15 +272,17 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
           if device.isConnected() {
             connectedAddresses.insert(address)
           }
-          if !registeredSet.contains(address) {
-            available.append(
-              BluetoothPeripheral(id: address, name: device.name ?? "Unknown Device")
-            )
-          }
+          paired.append(
+            BluetoothPeripheral(id: address, name: device.name ?? "Unknown Device")
+          )
         }
 
         DispatchQueue.main.async {
-          self.discoveredPeripherals = available
+          // Snapshot all paired devices; `availablePeripherals` filters out
+          // registered ones at read time. Filtering here instead would mean
+          // unregistering a peripheral can't immediately surface it under
+          // "Available" until the next fetch (e.g. tab switch).
+          self.discoveredPeripherals = paired
           for id in registeredIDs {
             let isConnected = connectedAddresses.contains(id)
             // Don't overwrite an in-flight .connecting state with a stale read.
@@ -352,6 +407,46 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
         self?.connectionStates[id] = state
       }
     }
+  }
+
+  // MARK: - Pair Watchdog
+
+  /// Schedules a watchdog that flips the peripheral back to `.disconnected`
+  /// if `devicePairingFinished` hasn't fired within `Constants.pairTimeout`.
+  /// We don't explicitly cancel from the success / pre-flight-failure paths;
+  /// the handler no-ops if the state has already moved on.
+  private func schedulePairWatchdog(for peripheral: BluetoothPeripheral) {
+    let address = peripheral.id
+    let name = peripheral.name
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      self.pairTimers[address]?.cancel()
+      let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
+      timer.schedule(deadline: .now() + Constants.pairTimeout)
+      timer.setEventHandler { [weak self] in
+        self?.handlePairTimeout(address: address, name: name)
+      }
+      timer.resume()
+      self.pairTimers[address] = timer
+    }
+  }
+
+  private func handlePairTimeout(address: String, name: String) {
+    // Timer fires on the main queue.
+    guard connectionStates[address] == .connecting else {
+      pairTimers.removeValue(forKey: address)
+      return
+    }
+    pendingPairs[address]?.stop()
+    pendingPairs.removeValue(forKey: address)
+    pairTimers.removeValue(forKey: address)
+    connectionStates[address] = .disconnected
+    NotificationManager.showNotification(
+      title: "Pairing Timed Out",
+      body:
+        "Couldn't pair \(name). It may currently be connected to your other Mac — try the menu-bar switch action instead.",
+      identifier: "pair-timeout-\(address)"
+    )
   }
 
   // MARK: - Private Methods

@@ -25,7 +25,12 @@ final class PairingStore: ObservableObject {
   private static let pbkdfSalt = "BlueSwitch-PSK-v2"
   private static let pbkdfIterations: UInt32 = 600_000
   private static let pbkdfKeyLength = 32
-  private static let keychainService = "com.blueswitch.psk-v2"
+  /// Bumped from `psk-v2` when we moved to the data protection keychain.
+  /// The legacy keychain and the data protection keychain are separate
+  /// stores; bumping the service name makes the migration explicit and
+  /// prevents the legacy item from shadowing the new one if a user ever
+  /// downgrades and re-pairs.
+  private static let keychainService = "com.blueswitch.psk-v3"
   private static let keychainAccount = "shared"
 
   // MARK: - Published State
@@ -111,15 +116,36 @@ final class PairingStore: ObservableObject {
     }
   }
 
-  /// Removes the stored PSK.
+  /// Removes the stored PSK. Runs the keychain call off-main so the
+  /// authorization prompt (if any) doesn't block the UI, and updates the
+  /// published state directly on success rather than re-reading the
+  /// keychain — the re-read could trigger a second authorization prompt
+  /// on the same item we just had to authorize, which manifested as the
+  /// user needing to click Unpair twice.
   func unpair() {
-    let query: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: Self.keychainService,
-      kSecAttrAccount as String: Self.keychainAccount,
-    ]
-    SecItemDelete(query as CFDictionary)
-    refreshState()
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      guard let self = self else { return }
+      let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: Self.keychainService,
+        kSecAttrAccount as String: Self.keychainAccount,
+        kSecUseDataProtectionKeychain as String: true,
+      ]
+      let status = SecItemDelete(query as CFDictionary)
+      DispatchQueue.main.async {
+        if status == errSecSuccess || status == errSecItemNotFound {
+          self.isPaired = false
+          self.fingerprint = nil
+        } else {
+          NotificationManager.showNotification(
+            title: "Couldn't Unpair",
+            body:
+              "macOS returned error \(status) clearing the saved pairing key. Try again from Settings → Pairing.",
+            identifier: "unpair-failed"
+          )
+        }
+      }
+    }
   }
 
   // MARK: - Internal Helpers
@@ -180,6 +206,7 @@ final class PairingStore: ObservableObject {
       kSecAttrAccount as String: Self.keychainAccount,
       kSecReturnData as String: true,
       kSecMatchLimit as String: kSecMatchLimitOne,
+      kSecUseDataProtectionKeychain as String: true,
     ]
     var item: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -192,6 +219,7 @@ final class PairingStore: ObservableObject {
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: Self.keychainService,
       kSecAttrAccount as String: Self.keychainAccount,
+      kSecUseDataProtectionKeychain as String: true,
     ]
     SecItemDelete(delete as CFDictionary)
 
@@ -202,6 +230,7 @@ final class PairingStore: ObservableObject {
       kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
       kSecAttrSynchronizable as String: false,
       kSecValueData as String: data,
+      kSecUseDataProtectionKeychain as String: true,
     ]
     let status = SecItemAdd(add as CFDictionary, nil)
     guard status == errSecSuccess else {

@@ -73,8 +73,11 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
   // MARK: - Public Methods
 
   func registerNetworkDevice(device: NetworkDevice) {
+    // Don't drop from `discoveredNetworkDevices`; `availableNetworkDevices`
+    // filters by `!networkDevices.contains` at read time. Dropping here
+    // would mean `removeNetworkDevice` can't re-surface the Mac under
+    // "Available Devices" until the next Bonjour resolution.
     networkDevices.append(device)
-    removeFromDiscoveredDevices(device)
     saveNetworkDevices()
   }
 
@@ -201,9 +204,6 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
     }
   }
 
-  private func removeFromDiscoveredDevices(_ device: NetworkDevice) {
-    discoveredNetworkDevices.removeAll { $0.id == device.id }
-  }
 }
 
 /// Represents different types of device commands
@@ -311,8 +311,22 @@ extension NetworkDeviceStore {
             if let err2 = err2 {
               print("Notification payload send failed: \(err2)")
               done(false)
-            } else {
-              done(true)
+              return
+            }
+            // Wait for the receiver's OP_SUCCESS/OP_FAILED before tearing
+            // down. `NWConnection.send(.contentProcessed)` only confirms
+            // local buffering, and the subsequent cancel() can drop frames
+            // still in flight — without an ack, the peer often never sees
+            // the payload.
+            channel.receive { result in
+              switch result {
+              case .failure(let err):
+                print("Notification ack receive failed: \(err)")
+                done(false)
+              case .success(let data):
+                let response = String(data: data, encoding: .utf8) ?? ""
+                done(DeviceCommand(rawValue: response) == .operationSuccess)
+              }
             }
           }
         }
@@ -353,8 +367,20 @@ extension NetworkDeviceStore {
             if let err2 = err2 {
               print("syncPeripherals payload send failed: \(err2)")
               done(false)
-            } else {
-              done(true)
+              return
+            }
+            // Same rationale as the notification path: wait for the
+            // receiver's OP_SUCCESS so we don't cancel() before the peer
+            // actually processes the payload.
+            channel.receive { result in
+              switch result {
+              case .failure(let err):
+                print("syncPeripherals ack receive failed: \(err)")
+                done(false)
+              case .success(let data):
+                let response = String(data: data, encoding: .utf8) ?? ""
+                done(DeviceCommand(rawValue: response) == .operationSuccess)
+              }
             }
           }
         }

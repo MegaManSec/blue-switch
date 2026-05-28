@@ -55,7 +55,9 @@ struct BluetoothPeripheralSettingsView: View {
     case .connected:
       bluetoothStore.unregisterFromPC(peripheral)
     case .disconnected:
-      bluetoothStore.connectPeripheral(peripheral)
+      // Coordinated path asks the peer to release first if it's holding
+      // the peripheral, otherwise pairing locally would just hang.
+      bluetoothStore.connectPeripheralCoordinated(peripheral)
     case .connecting:
       break  // Pairing in flight; button is disabled in the UI.
     }
