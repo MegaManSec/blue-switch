@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 /// View responsible for displaying and managing miscellaneous application settings
@@ -5,12 +6,20 @@ struct OtherSettingsView: View {
   // MARK: - Properties
 
   @Environment(\.openURL) private var openURL
+  @State private var launchAtLogin: Bool = false
 
   // MARK: - View Content
 
   /// Form content containing setting options
   private var formContent: some View {
     Form {
+      if #available(macOS 13.0, *) {
+        Section {
+          Toggle("Launch at Login", isOn: $launchAtLogin)
+            .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
+            .help("Start Blue Switch automatically when you log in to this Mac.")
+        }
+      }
       Section {
         SettingsRowView(
           title: "License Information",
@@ -19,6 +28,7 @@ struct OtherSettingsView: View {
         )
       }
     }
+    .onAppear(perform: refreshLaunchAtLogin)
   }
 
   var body: some View {
@@ -37,6 +47,26 @@ struct OtherSettingsView: View {
     guard let url = URL(string: "https://github.com/MegaManSec/blue-switch/blob/main/LICENSE")
     else { return }
     openURL(url)
+  }
+
+  private func refreshLaunchAtLogin() {
+    if #available(macOS 13.0, *) {
+      launchAtLogin = (SMAppService.mainApp.status == .enabled)
+    }
+  }
+
+  @available(macOS 13.0, *)
+  private func setLaunchAtLogin(_ enabled: Bool) {
+    do {
+      if enabled {
+        try SMAppService.mainApp.register()
+      } else {
+        try SMAppService.mainApp.unregister()
+      }
+    } catch {
+      NSLog("Blue Switch: failed to update Launch at Login: \(error.localizedDescription)")
+      launchAtLogin = (SMAppService.mainApp.status == .enabled)
+    }
   }
 }
 
