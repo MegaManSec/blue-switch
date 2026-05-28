@@ -296,6 +296,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
+  /// Right-click menu's Mac entry. Switches the persisted Settings tab to
+  /// Device and opens Settings, so the row has an actual affordance instead
+  /// of just being a greyed-out label.
+  @objc func handleMacMenuClick(_ sender: NSMenuItem) {
+    // Tag matches `SettingsView`'s Device tab — kept in sync via this constant.
+    UserDefaults.standard.set(Self.deviceTabIndex, forKey: "settings-selected-tab")
+    openSettingsWindow(sender)
+  }
+
+  /// Tag of the Device tab in `SettingsView`. Keep in sync if tabs reorder.
+  private static let deviceTabIndex = 1
+
+  /// AppKit's auto-validation routes through here for menu items targeting
+  /// this delegate. Mac entries are enabled only when the peer is currently
+  /// reachable on the network (`device.isActive`); everything else passes
+  /// through.
+  @objc func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+    if menuItem.action == #selector(handleMacMenuClick(_:)) {
+      guard let id = menuItem.representedObject as? String,
+        let device = networkStore.networkDevices.first(where: { $0.id == id })
+      else { return false }
+      return device.isActive
+    }
+    return true
+  }
+
   /// Open the SwiftUI `Settings` scene declared in `Blue_SwitchApp`. The
   /// previous code hosted `SettingsView` inside a manually-built `NSWindow`,
   /// which suppresses SwiftUI `.help(...)` tooltips; routing through the
