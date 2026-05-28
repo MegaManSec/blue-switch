@@ -20,6 +20,7 @@ struct NetworkDeviceManagementView: View {
   // MARK: - Dependencies
 
   @ObservedObject private var networkStore = NetworkDeviceStore.shared
+  @ObservedObject private var pairing = PairingStore.shared
 
   // MARK: - State
 
@@ -29,6 +30,16 @@ struct NetworkDeviceManagementView: View {
 
   private var formContent: some View {
     Form {
+      if !pairing.isPaired {
+        Section {
+          Text(
+            "Pair both Macs in the Pairing tab to enable Notify, Sync, and the menu-bar switch."
+          )
+          .font(.callout)
+          .foregroundColor(.secondary)
+        }
+      }
+
       RegisteredDevicesSectionView(
         devices: networkStore.networkDevices,
         onDeviceNotify: handleDeviceNotification,
