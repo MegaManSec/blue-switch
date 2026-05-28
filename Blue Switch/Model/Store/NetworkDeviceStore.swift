@@ -73,8 +73,11 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
   // MARK: - Public Methods
 
   func registerNetworkDevice(device: NetworkDevice) {
+    // Don't drop from `discoveredNetworkDevices`; `availableNetworkDevices`
+    // filters by `!networkDevices.contains` at read time. Dropping here
+    // would mean `removeNetworkDevice` can't re-surface the Mac under
+    // "Available Devices" until the next Bonjour resolution.
     networkDevices.append(device)
-    removeFromDiscoveredDevices(device)
     saveNetworkDevices()
   }
 
@@ -201,9 +204,6 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
     }
   }
 
-  private func removeFromDiscoveredDevices(_ device: NetworkDevice) {
-    discoveredNetworkDevices.removeAll { $0.id == device.id }
-  }
 }
 
 /// Represents different types of device commands
