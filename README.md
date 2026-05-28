@@ -9,6 +9,7 @@ This is a security-hardened fork of [HoshimuraYuto/blue-switch](https://github.c
 1. Grab the latest build from the [releases page](https://github.com/MegaManSec/magic-switch/releases).
 2. Unzip and move `Magic Switch.app` to `/Applications`.
 3. First launch: macOS will block it because the build isn't signed. Right-click → Open, or System Settings → Privacy & Security → "Open Anyway".
+4. Approve **Bluetooth** and **Local Network** access when macOS prompts. Both are required — Bluetooth to control the peripherals, Local Network to discover and talk to the other Mac. If you dismiss the prompts, grant them later under System Settings → Privacy & Security.
 
 ## Setup
 
@@ -63,6 +64,38 @@ sh ./setup-hooks.sh
 ```
 
 This sets `core.hooksPath` to the in-repo `.hooks/` directory, so be aware you're trusting whatever lives there in your current checkout.
+
+## Architecture
+
+Two Macs discover each other over Bonjour, then exchange short commands over a sealed TCP channel keyed by the shared pairing code.
+
+```
+                  Bonjour discovery (_magicswitch._tcp. in local.)
+                 ┌──────────────────────────────────────────────────┐
+                 │                                                  │
+                 ▼                                                  ▼
+   ┌────────────────────────────┐                    ┌────────────────────────────┐
+   │  Mac A — Magic Switch      │                    │  Mac B — Magic Switch      │
+   │                            │                    │                            │
+   │   AppDelegate              │                    │   AppDelegate              │
+   │   (status item, menu)      │                    │   (status item, menu)      │
+   │       │         ▲          │                    │       │         ▲          │
+   │       ▼         │          │     sealed TCP     │       ▼         │          │
+   │   Outgoing  Incoming       │◀── ChaCha20-Poly ─▶│   Outgoing  Incoming       │
+   │   Conn.     Conn.          │    (per session)   │   Conn.     Conn.          │
+   │       │         │          │                    │       │         │          │
+   │       ▼         ▼          │                    │       ▼         ▼          │
+   │   NetworkDeviceStore       │                    │   NetworkDeviceStore       │
+   │   BluetoothPeripheralStore │                    │   BluetoothPeripheralStore │
+   │   PairingStore             │                    │   PairingStore             │
+   │       │                    │                    │       │                    │
+   │       ▼ IOBluetooth        │                    │       ▼ IOBluetooth        │
+   │   Magic Keyboard           │ one host at a time │   Magic Keyboard           │
+   │   Magic Trackpad           │ (peripherals owned │   Magic Trackpad           │
+   │   Magic Mouse              │  by whichever Mac  │   Magic Mouse              │
+   │                            │  took them last)   │                            │
+   └────────────────────────────┘                    └────────────────────────────┘
+```
 
 ## Security model
 
