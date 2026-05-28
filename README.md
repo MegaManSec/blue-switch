@@ -2,7 +2,7 @@
 
 A macOS menu-bar utility that hands off Magic Keyboard, Magic Trackpad, and Magic Mouse between two Macs with one click — no KVM, no cables.
 
-This is a security-hardened fork of [HoshimuraYuto/blue-switch](https://github.com/HoshimuraYuto/blue-switch). The original ships an unauthenticated, unencrypted LAN protocol that lets anyone on the same Wi-Fi take over your Bluetooth peripherals or spoof notifications. This fork replaces that channel with a sealed, mutually-authenticated channel keyed by a 12-character pairing code you share between your two Macs.
+This is a security-hardened fork of [HoshimuraYuto/blue-switch](https://github.com/HoshimuraYuto/blue-switch). The original ships an unauthenticated, unencrypted LAN protocol that lets anyone on the same Wi-Fi take over your Bluetooth peripherals or spoof notifications. This fork replaces that channel with a sealed, mutually-authenticated channel keyed by a 12-character pairing code you share between your two Macs — with a massively improved UI/UX over the original: a guided pairing flow, inline status feedback, per-peripheral switching, a needs-attention menu-bar icon, and safe preflight-and-rollback handoffs.
 
 ## Installation
 
@@ -18,20 +18,20 @@ Four Settings tabs to know — two of them use the word "pair" in different sens
 - **Peripheral** — the Bluetooth devices Magic Switch hands back and forth (Magic Keyboard / Mouse / Trackpad).
 - **Device** — the *other Mac on your network* you're swapping with.
 - **Pairing** — a cryptographic shared key between the two Macs. *Required.* This is **not** the Bluetooth pairing in step 1 — that's between your peripherals and each Mac, done in System Settings. This one is between the two Macs themselves, done inside Magic Switch.
-- **Other** — app preferences: turn on **Launch at Login**, see the installed version, and get notified about updates. Magic Switch checks the [releases page](https://github.com/MegaManSec/magic-switch/releases) about once a day and surfaces **Update Available** here and in the menu-bar menu; it never updates itself.
+- **Other** — app preferences: turn on **Launch at Login**, see the installed version, and get notified about updates (see [Updates](#updates)).
 
 Do this on **both** Macs.
 
-1. **In System Settings → Bluetooth on each Mac**, pair your Magic Keyboard / Mouse / Trackpad to that Mac. Each peripheral has to be paired to *both* Macs (Apple's Magic devices remember multiple hosts but only connect to one at a time — Magic Switch flips which Mac currently holds the session). Magic Switch doesn't do this step; you do it the normal macOS way.
+1. **In System Settings → Bluetooth**, pair your Magic Keyboard / Mouse / Trackpad to a Mac the normal macOS way — that's how it first shows up in the **Peripheral** tab. Apple's Magic devices remember multiple hosts but only connect to one at a time; to flip ownership, Magic Switch pairs the device to the Mac that's taking it and releases it from the other (it does this over IOBluetooth — you don't re-pair by hand on every switch). Pairing each peripheral to *both* Macs up front is the most reliable way to start, but you can also pair it on just one, sync the list in step 5, and let Magic Switch pair it on demand from there.
 2. Launch Magic Switch. Grant **Bluetooth** and **Local Network** permission when prompted.
 3. Right-click the menu-bar icon → Settings:
    - **Peripheral** tab: tick the Magic devices you want Magic Switch to manage.
    - **Device** tab: pick the other Mac from "Available Devices."
-4. **Pairing** tab — *new in this fork, required*:
+4. **Pairing** tab — *required*:
    - On one Mac, click "Generate Code." A twelve-character code appears.
    - On the other, click "Enter Code" and type it in.
    - Both Macs should show the same eight-character fingerprint after pairing. If they don't, you typed the code wrong.
-5. Hit the sync button on the **Device** tab to share your peripheral list with the other Mac.
+5. Sync your peripheral list to the other Mac: on the **Device** tab, find it under **Connected Devices** and click its **share button** (the box-with-an-up-arrow icon, beside **Ping**). A "Synced N peripherals to …" line appears under the row on success. The button is greyed out while that Mac is offline.
 
 Until step 4 completes, the switch action and peripheral sync refuse to talk to the peer.
 
@@ -45,12 +45,17 @@ Until step 4 completes, the switch action and peripheral sync refuse to talk to 
 
 The menu-bar icon also signals state: a **warning triangle** means Magic Switch needs attention (not paired, or Bluetooth off/denied) — hover for the reason; **up/down arrows** flash briefly while peripherals are moving between Macs.
 
+## Updates
+
+Magic Switch tells you when there's a new version — it never updates itself. About once a day it makes a single anonymous request to GitHub's public releases API for [this repo](https://github.com/MegaManSec/magic-switch/releases) and compares your installed version with the latest published release; no account, sign-in, or telemetry is involved. When a newer version exists, an **Update Available** notice (with the new version number) appears at the top of the right-click menu and in **Settings → Other** — clicking it opens the release page so you can download and install it yourself. A failed check (offline, rate-limited, etc.) is retried about hourly; otherwise checks happen at most once every 24 hours. Your installed version is always shown in **Settings → Other**.
+
 ## Troubleshooting
 
 - Both Macs running Magic Switch, both showing "Paired" in the Pairing tab.
 - Devices powered on; Bluetooth enabled.
 - Same network; not blocked by firewall.
 - Bluetooth and Local Network permissions granted in System Settings → Privacy & Security.
+- A **greyed-out device** — in the Device tab or the right-click menu — means it isn't reachable on the network right now (the other Mac is asleep, off Wi-Fi, or not running Magic Switch). Ping, Sync, and switching stay disabled until it's back online.
 - On the **Device** tab, **Ping** tests whether the two Macs can reach each other over the secure channel.
 
 ## Developer notes
