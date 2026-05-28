@@ -36,8 +36,6 @@ jobs:
         run: |
           npm install -g \
             semantic-release@24 \
-            @semantic-release/changelog@6 \
-            @semantic-release/git@10 \
             @semantic-release/github@11
 
       - name: Determine version
@@ -145,13 +143,7 @@ jobs:
         run: |
           npm install -g \
             semantic-release@24 \
-            @semantic-release/changelog@6 \
-            @semantic-release/git@10 \
             @semantic-release/github@11
-
-      - name: Replace project.pbxproj
-        run: |
-          cp -f artifacts/project.pbxproj "Blue Switch.xcodeproj/project.pbxproj"
 
       - name: Release
         env:
