@@ -139,15 +139,22 @@ private struct PeripheralRowView: View {
       Spacer()
       if showConnectionStatus {
         Button(peripheral.isConnected ? "Remove from PC" : "Connect to PC", action: primaryAction)
+          .help(
+            peripheral.isConnected
+              ? "Disconnect and unpair this peripheral from your Mac."
+              : "Pair this peripheral with your Mac."
+          )
         Button(action: { secondaryAction?() }) {
           Image(systemName: "minus.circle")
             .foregroundColor(.red)
         }
+        .help("Remove this peripheral from Blue Switch's list.")
       } else {
         Button(action: primaryAction) {
           Image(systemName: "plus.circle")
             .foregroundColor(.blue)
         }
+        .help("Add this peripheral to Blue Switch's list.")
       }
     }
   }

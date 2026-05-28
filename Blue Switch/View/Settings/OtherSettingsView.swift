@@ -12,7 +12,11 @@ struct OtherSettingsView: View {
   private var formContent: some View {
     Form {
       Section {
-        SettingsRowView(title: "License Information", action: showLicenseInfo)
+        SettingsRowView(
+          title: "License Information",
+          help: "Open the project license in your browser.",
+          action: showLicenseInfo
+        )
       }
     }
   }
@@ -43,6 +47,7 @@ private struct SettingsRowView: View {
   // MARK: - Properties
 
   let title: String
+  let help: String
   let action: () -> Void
 
   // MARK: - View Content
@@ -58,6 +63,7 @@ private struct SettingsRowView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .help(help)
   }
 }
 

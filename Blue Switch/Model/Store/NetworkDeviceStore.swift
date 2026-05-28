@@ -116,6 +116,14 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
   }
 
   func sendNotification(to device: NetworkDevice) {
+    guard PairingStore.shared.isPaired else {
+      NotificationManager.showNotification(
+        title: "Not Paired",
+        body: "Pair this Mac first to send notifications to \(device.name)."
+      )
+      return
+    }
+
     let title = "New Notification"
     let body =
       "You have a new notification from \(Host.current().localizedName ?? "Unknown Device")"
