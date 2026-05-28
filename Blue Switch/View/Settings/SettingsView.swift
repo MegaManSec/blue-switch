@@ -29,21 +29,25 @@ struct SettingsView: View {
         .tabItem {
           Label(TabItem.devices.text, systemImage: TabItem.devices.image)
         }
-        .help("Manage Bluetooth peripherals (keyboards, mice) to switch between Macs.")
+        .help(
+          "Pick which paired Bluetooth peripherals Blue Switch should manage. Pair them in System Settings → Bluetooth first; this tab just selects from those."
+        )
         .tag(0)
 
       NetworkDeviceManagementView()
         .tabItem {
           Label(TabItem.mac.text, systemImage: TabItem.mac.image)
         }
-        .help("Manage the other Macs on your network.")
+        .help("The other Mac you're switching with. Discovered on the local network.")
         .tag(1)
 
       PairingSettingsView()
         .tabItem {
           Label(TabItem.pairing.text, systemImage: TabItem.pairing.image)
         }
-        .help("Set up the pairing key between this Mac and your other Mac.")
+        .help(
+          "Cryptographic shared key with the other Mac. Required by Blue Switch — separate from the System Settings → Bluetooth pairing of your peripherals."
+        )
         .tag(2)
 
       OtherSettingsView()
