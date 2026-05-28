@@ -214,6 +214,12 @@ enum DeviceCommand: String, Codable {
   case operationFailed = "OP_FAILED"
   case notification = "NOTIFICATION"
   case syncPeripherals = "SYNC_PERIPHERALS"
+  /// Two-frame: opcode then a single peripheral's MAC address. The peer
+  /// releases just that peripheral (used by per-peripheral switch flows).
+  case unregisterOne = "UNREGISTER_ONE"
+  /// Two-frame: opcode then a single peripheral's MAC address. The peer
+  /// connects just that peripheral.
+  case connectOne = "CONNECT_ONE"
 }
 
 // MARK: - Health Check Extension
@@ -396,6 +402,74 @@ extension NetworkDeviceStore {
           )
         }
       }
+    )
+  }
+
+  // MARK: - Per-Peripheral Switch Opcodes
+
+  /// Asks `device` to release the peripheral with the given MAC address.
+  /// Two-frame protocol: opcode + MAC, then OP_SUCCESS/OP_FAILED.
+  func executeUnregisterOne(
+    address: String,
+    on device: NetworkDevice,
+    completion: @escaping (Result<Void, OutgoingFailure>) -> Void
+  ) {
+    sendTwoFrameCommand(.unregisterOne, payload: address, to: device, completion: completion)
+  }
+
+  /// Asks `device` to take ownership of the peripheral with the given MAC
+  /// address. Two-frame protocol mirroring `executeUnregisterOne`.
+  func executeConnectOne(
+    address: String,
+    on device: NetworkDevice,
+    completion: @escaping (Result<Void, OutgoingFailure>) -> Void
+  ) {
+    sendTwoFrameCommand(.connectOne, payload: address, to: device, completion: completion)
+  }
+
+  /// Shared helper for "opcode + single payload frame, await OP_SUCCESS".
+  /// Kept private to this extension; the older two-frame call sites
+  /// (`sendNotificationOverSecure`, `sendPeripheralSync`) still have their
+  /// own inline copies because their failure surfaces differ.
+  private func sendTwoFrameCommand(
+    _ command: DeviceCommand,
+    payload: String,
+    to device: NetworkDevice,
+    completion: @escaping (Result<Void, OutgoingFailure>) -> Void
+  ) {
+    guard PairingStore.shared.isPaired else {
+      completion(.failure(.notPaired))
+      return
+    }
+    let outgoing = OutgoingConnection(host: device.host, port: UInt16(device.port))
+    outgoing.run(
+      body: { channel, done in
+        channel.send(Data(command.rawValue.utf8)) { err in
+          if let err = err {
+            print("\(command.rawValue) command send failed: \(err)")
+            done(false)
+            return
+          }
+          channel.send(Data(payload.utf8)) { err2 in
+            if let err2 = err2 {
+              print("\(command.rawValue) payload send failed: \(err2)")
+              done(false)
+              return
+            }
+            channel.receive { result in
+              switch result {
+              case .failure(let err):
+                print("\(command.rawValue) ack receive failed: \(err)")
+                done(false)
+              case .success(let data):
+                let response = String(data: data, encoding: .utf8) ?? ""
+                done(DeviceCommand(rawValue: response) == .operationSuccess)
+              }
+            }
+          }
+        }
+      },
+      completion: completion
     )
   }
 }

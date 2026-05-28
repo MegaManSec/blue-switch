@@ -140,14 +140,19 @@ final class IncomingConnection {
     } else if let command = DeviceCommand(rawValue: message) {
       handleCommand(command)
     } else {
+      // Unknown opcode (or garbled payload). Reply OP_FAILED so a newer peer
+      // that introduces opcodes we don't recognize gets a fast, clean
+      // failure instead of hanging on a receive that never comes.
       print("Unexpected payload with no pending command")
+      sendString(DeviceCommand.operationFailed.rawValue)
     }
   }
 
   private func handleCommand(_ command: DeviceCommand) {
     lastReceivedCommand = command
     switch command {
-    case .notification, .syncPeripherals:
+    case .notification, .syncPeripherals, .unregisterOne, .connectOne:
+      // Two-frame commands; data frame handled in `handleCommandData`.
       break
     case .connectAll:
       let store = bluetoothStore
@@ -207,10 +212,49 @@ final class IncomingConnection {
         teardown()
         return
       }
+    case .unregisterOne:
+      guard Self.isValidMACAddress(message) else {
+        print("unregisterOne: invalid MAC address: \(message)")
+        sendString(DeviceCommand.operationFailed.rawValue)
+        break
+      }
+      let store = bluetoothStore
+      let address = message
+      DispatchQueue.main.async {
+        if let peripheral = store.peripherals.first(where: { $0.id == address }) {
+          store.unregisterFromPC(peripheral)
+        }
+      }
+      // Reply OP_SUCCESS even if the peripheral isn't in our registered
+      // list — from the peer's perspective the goal ("you don't hold it
+      // anymore") is satisfied either way.
+      sendString(DeviceCommand.operationSuccess.rawValue)
+    case .connectOne:
+      guard Self.isValidMACAddress(message) else {
+        print("connectOne: invalid MAC address: \(message)")
+        sendString(DeviceCommand.operationFailed.rawValue)
+        break
+      }
+      let store = bluetoothStore
+      let address = message
+      DispatchQueue.main.async {
+        if let peripheral = store.peripherals.first(where: { $0.id == address }) {
+          store.connectPeripheral(peripheral)
+        }
+      }
+      sendString(DeviceCommand.operationSuccess.rawValue)
     default:
       break
     }
     lastReceivedCommand = nil
+  }
+
+  /// Same shape as `IOBluetoothDevice.addressString`: six hex octets
+  /// separated by `-`. Used to validate per-peripheral opcodes' MAC frame
+  /// before we touch the store with peer-supplied input.
+  private static func isValidMACAddress(_ value: String) -> Bool {
+    let pattern = "^([0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}$"
+    return value.range(of: pattern, options: .regularExpression) != nil
   }
 
   // MARK: - Sending
