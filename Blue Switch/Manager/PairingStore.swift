@@ -125,7 +125,15 @@ final class PairingStore: ObservableObject {
   /// keychain — the re-read could trigger a second authorization prompt
   /// on the same item we just had to authorize, which manifested as the
   /// user needing to click Unpair twice.
-  func unpair() {
+  ///
+  /// `completion` receives `nil` on success or the underlying `OSStatus`
+  /// when SecItemDelete fails for any reason other than "item not found".
+  /// We pass that back so the Pairing tab can render an inline error in
+  /// the view itself — system notifications are unreliable on
+  /// ad-hoc-signed sandboxed builds (UNUserNotificationCenter refuses to
+  /// authorize them), so an Unpair that fails would otherwise look like
+  /// "nothing happened".
+  func unpair(completion: ((OSStatus?) -> Void)? = nil) {
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       guard let self = self else { return }
       let query: [String: Any] = [
@@ -134,17 +142,14 @@ final class PairingStore: ObservableObject {
         kSecAttrAccount as String: Self.keychainAccount,
       ]
       let status = SecItemDelete(query as CFDictionary)
+      print("PairingStore.unpair: SecItemDelete -> \(status)")
       DispatchQueue.main.async {
         if status == errSecSuccess || status == errSecItemNotFound {
           self.isPaired = false
           self.fingerprint = nil
+          completion?(nil)
         } else {
-          NotificationManager.showNotification(
-            title: "Couldn't Unpair",
-            body:
-              "macOS returned error \(status) clearing the saved pairing key. Try again from Settings → Pairing.",
-            identifier: "unpair-failed"
-          )
+          completion?(status)
         }
       }
     }

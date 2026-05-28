@@ -10,6 +10,7 @@ struct PairingSettingsView: View {
   @State private var showGenerateSheet = false
   @State private var showEnterSheet = false
   @State private var showUnpairAlert = false
+  @State private var unpairErrorStatus: OSStatus?
 
   // MARK: - Body
 
@@ -35,7 +36,10 @@ struct PairingSettingsView: View {
           "Blue Switch will stop accepting commands from your other Mac until you pair again."
         ),
         primaryButton: .destructive(Text("Unpair")) {
-          pairing.unpair()
+          unpairErrorStatus = nil
+          pairing.unpair { status in
+            unpairErrorStatus = status
+          }
         },
         secondaryButton: .cancel()
       )
@@ -87,6 +91,11 @@ struct PairingSettingsView: View {
       }
       .foregroundColor(.red)
       .help("Remove the saved pairing key. This Mac will stop accepting commands.")
+      if let status = unpairErrorStatus {
+        Text("Couldn't unpair: keychain returned error \(status).")
+          .foregroundColor(.red)
+          .font(.caption)
+      }
       Spacer()
     }
     .frame(maxWidth: .infinity, alignment: .leading)
