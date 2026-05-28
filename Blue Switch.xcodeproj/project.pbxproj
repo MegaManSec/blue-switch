@@ -31,7 +31,6 @@
 		076AB2282CE9D690004D45F0 /* NetworkDeviceManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB20E2CE9D690004D45F0 /* NetworkDeviceManagementView.swift */; };
 		076AB2292CE9D690004D45F0 /* OtherSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB20F2CE9D690004D45F0 /* OtherSettingsView.swift */; };
 		076AB22A2CE9D690004D45F0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB2102CE9D690004D45F0 /* SettingsView.swift */; };
-		076AB22B2CE9D690004D45F0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB2152CE9D690004D45F0 /* ContentView.swift */; };
 		076AB22C2CE9D690004D45F0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 076AB2072CE9D690004D45F0 /* Preview Assets.xcassets */; };
 		076AB22D2CE9D690004D45F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 076AB2132CE9D690004D45F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -81,7 +80,6 @@
 		076AB2102CE9D690004D45F0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		076AB2132CE9D690004D45F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		076AB2142CE9D690004D45F0 /* Blue_Switch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Blue_Switch.entitlements; sourceTree = "<group>"; };
-		076AB2152CE9D690004D45F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		077473F22CD8426D00571393 /* Blue Switch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Blue Switch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		077474052CD8426F00571393 /* Blue SwitchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Blue SwitchTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0774740F2CD8426F00571393 /* Blue SwitchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Blue SwitchUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -222,7 +220,6 @@
 				076AB2122CE9D690004D45F0 /* View */,
 				076AB2132CE9D690004D45F0 /* Assets.xcassets */,
 				076AB2142CE9D690004D45F0 /* Blue_Switch.entitlements */,
-				076AB2152CE9D690004D45F0 /* ContentView.swift */,
 			);
 			path = "Blue Switch";
 			sourceTree = "<group>";
@@ -408,7 +405,6 @@
 				076AB2282CE9D690004D45F0 /* NetworkDeviceManagementView.swift in Sources */,
 				076AB2292CE9D690004D45F0 /* OtherSettingsView.swift in Sources */,
 				076AB22A2CE9D690004D45F0 /* SettingsView.swift in Sources */,
-				076AB22B2CE9D690004D45F0 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -583,7 +579,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
 				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.star-village.blue-switch";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -612,7 +608,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
 				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.star-village.blue-switch";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -629,7 +625,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
 				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.star-village.blue-switch.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -646,7 +642,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
 				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.star-village.blue-switch.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -662,7 +658,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
 				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.star-village.blue-switch.uitests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -678,7 +674,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.5;
 				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.star-village.blue-switch.uitests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.uitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;

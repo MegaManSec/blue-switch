@@ -33,7 +33,7 @@ struct OtherSettingsView: View {
   // MARK: - Private Methods
 
   private func showLicenseInfo() {
-    openURL(URL(string: "https://github.com/HoshimuraYuto/Blue-Switch/blob/main/LICENSE")!)
+    openURL(URL(string: "https://github.com/MegaManSec/blue-switch/blob/main/LICENSE")!)
   }
 }
 
