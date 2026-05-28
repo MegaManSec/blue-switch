@@ -97,11 +97,15 @@ final class MenuBarView: MenuBarPresentable {
         action: #selector(AppDelegate.openSettingsWindow(_:)),
         keyEquivalent: Constants.KeyEquivalents.settings))
 
+    // Route through AppDelegate so the status-bar Quit really exits;
+    // `applicationShouldTerminate` cancels other terminate sources
+    // (Cmd+Q with Settings focused, Dock-icon → Quit) and just closes
+    // the Settings window instead.
     menu.addItem(
       makeItem(
         title: Constants.Menu.quit,
         symbol: Constants.Symbols.quit,
-        action: #selector(NSApplication.terminate(_:)),
+        action: #selector(AppDelegate.quitFromStatusBar(_:)),
         keyEquivalent: Constants.KeyEquivalents.quit))
 
     return menu

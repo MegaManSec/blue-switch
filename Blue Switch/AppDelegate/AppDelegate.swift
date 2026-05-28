@@ -22,6 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// the scene's `showSettingsWindow:` action silently fails to produce a
   /// visible window in this app (LSUIElement + `.accessory`).
   private var settingsWindowController: NSWindowController?
+  /// Set true by `quitFromStatusBar(_:)` immediately before invoking
+  /// `terminate(_:)`. `applicationShouldTerminate(_:)` checks this to
+  /// distinguish "user picked Quit from our menu-bar menu" (real exit)
+  /// from "user pressed Cmd+Q with Settings focused or chose Quit from
+  /// the Dock" (just close the window, keep running).
+  private var quitFromStatusBarMenu = false
 
   // MARK: - Lifecycle Methods
 
@@ -45,6 +51,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return false
     }
     return true
+  }
+
+  /// Decide whether a `terminate(_:)` request should actually exit.
+  ///
+  /// - Status-bar menu → Quit: real exit (the flag is set in `quitFromStatusBar`).
+  /// - System-initiated (logout / shutdown / restart): real exit.
+  /// - Anything else (Cmd+Q while Settings focused, right-click Dock → Quit,
+  ///   etc.): cancel the terminate, just close Settings and drop the Dock
+  ///   icon. This is the "Blue Switch lives in the menu bar; the Dock entry
+  ///   is only there while Settings is open" mental model the user wants.
+  func applicationShouldTerminate(
+    _ sender: NSApplication
+  ) -> NSApplication.TerminateReply {
+    if quitFromStatusBarMenu { return .terminateNow }
+    if Self.isSystemInitiatedQuit() { return .terminateNow }
+    // Close any visible normal-level windows (the Settings window is the
+    // only one this app ever has). The willClose observer in
+    // `setupActivationPolicyTracking` will demote the activation policy
+    // back to `.accessory` shortly after; setting it here too just makes
+    // the Dock-icon disappearance feel immediate.
+    for window in NSApp.windows where window.isVisible && window.level == .normal {
+      window.close()
+    }
+    NSApp.setActivationPolicy(.accessory)
+    return .terminateCancel
+  }
+
+  /// True when the current AppleEvent reason is logout / shutdown / restart.
+  /// Without this check we'd block the system from quitting us during
+  /// shutdown, which can hang the logout flow.
+  private static func isSystemInitiatedQuit() -> Bool {
+    guard let event = NSAppleEventManager.shared().currentAppleEvent,
+      let reason = event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?
+        .enumCodeValue
+    else { return false }
+    return reason == kAELogOut
+      || reason == kAEReallyLogOut
+      || reason == kAEShowRestartDialog
+      || reason == kAEShowShutdownDialog
+      || reason == kAERestart
+      || reason == kAEShutDown
+  }
+
+  /// Status-bar menu's Quit handler. Sets the "real quit" flag so
+  /// `applicationShouldTerminate` lets us exit.
+  @objc func quitFromStatusBar(_ sender: Any?) {
+    quitFromStatusBarMenu = true
+    NSApp.terminate(sender)
   }
 
   deinit {
