@@ -132,6 +132,48 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
     print("\(peripheral.name) has been removed from the list")
   }
 
+  /// Per-peripheral entry point used by the Peripheral tab. Mirrors the
+  /// menu-bar switch choreography (see `AppDelegate.handleSwitchAction`'s
+  /// `.allDisconnected` branch): if there's a paired peer holding our
+  /// peripherals, ask it to release them before we try to pair locally.
+  /// Apple's Magic devices only honor one host at a time, so without this
+  /// step `IOBluetoothDevicePair.start()` just hangs (and the watchdog
+  /// would have to time it out).
+  ///
+  /// Note that we send `UNREGISTER_ALL`, not a per-peripheral release,
+  /// because the wire protocol has no per-peripheral unregister opcode.
+  /// Other peripherals on the peer get released too — same semantics as
+  /// the menu-bar switch.
+  func connectPeripheralCoordinated(_ peripheral: BluetoothPeripheral) {
+    let networkStore = NetworkDeviceStore.shared
+    guard let device = networkStore.networkDevices.first,
+      PairingStore.shared.isPaired,
+      device.isActive
+    else {
+      // No peer to coordinate with — just pair locally.
+      connectPeripheral(peripheral)
+      return
+    }
+
+    setConnectionState(.connecting, for: peripheral.id)
+    schedulePairWatchdog(for: peripheral)
+    networkStore.executeCommand(.unregisterAll) { [weak self] result in
+      guard let self = self else { return }
+      switch result {
+      case .success:
+        self.connectPeripheral(peripheral)
+      case .failure(let err):
+        self.setConnectionState(.disconnected, for: peripheral.id)
+        NotificationManager.showNotification(
+          title: "Couldn't Switch",
+          body:
+            "Couldn't ask \(device.name) to release \(peripheral.name): \(err.userMessage)",
+          identifier: "coord-connect-failed-\(peripheral.id)"
+        )
+      }
+    }
+  }
+
   func connectPeripheral(_ peripheral: BluetoothPeripheral) {
     setConnectionState(.connecting, for: peripheral.id)
     schedulePairWatchdog(for: peripheral)
