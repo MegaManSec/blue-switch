@@ -1,4 +1,6 @@
 import Cocoa
+import Combine
+import CoreBluetooth
 import SwiftUI
 
 /// Application delegate handling lifecycle and UI setup
@@ -12,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private var statusItem: NSStatusItem!
   private var settingsWindowController: NSWindowController?
+  private var bluetoothStateObserver: AnyCancellable?
+  private var lastBluetoothState: CBManagerState = .unknown
 
   // MARK: - Constants
 
@@ -32,7 +36,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func setupBluetooth() {
+    bluetoothStateObserver = BluetoothManager.shared.$state
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] state in
+        self?.handleBluetoothStateChange(state)
+      }
     BluetoothManager.shared.setup()
+  }
+
+  private func handleBluetoothStateChange(_ state: CBManagerState) {
+    defer { lastBluetoothState = state }
+    // Only notify on transitions into a problematic state, not on every
+    // delegate fire (which includes the initial .unknown → .poweredOn).
+    guard state != lastBluetoothState else { return }
+    switch state {
+    case .poweredOff:
+      NotificationManager.showNotification(
+        title: "Bluetooth Off",
+        body: "Blue Switch can't switch peripherals while Bluetooth is off."
+      )
+    case .unauthorized:
+      NotificationManager.showNotification(
+        title: "Bluetooth Permission Needed",
+        body: "Grant Bluetooth access in System Settings to use Blue Switch."
+      )
+    case .unsupported:
+      NotificationManager.showNotification(
+        title: "Bluetooth Unsupported",
+        body: "This Mac does not support the Bluetooth features Blue Switch needs."
+      )
+    case .poweredOn, .resetting, .unknown:
+      break
+    @unknown default:
+      break
+    }
   }
 
   private func setupStatusBar() {
