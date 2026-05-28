@@ -95,10 +95,32 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
         NotificationManager.showNotification(
           title: "Identity Mismatch",
           body:
-            "\(device.name) is advertising a different pairing key. Re-pair if you trust this device, otherwise this could be an impersonation attempt."
+            "\(device.name) is advertising a new pairing key. Open Settings → Device and choose Trust if you re-paired the other Mac yourself.",
+          identifier: "identity-mismatch-\(device.id)"
         )
       }
     }
+  }
+
+  /// Promote `pendingFingerprint` to the stored pin and re-mark the device
+  /// active. Invoked from the UI when the user explicitly trusts a new key
+  /// after an Identity Mismatch (e.g., they re-paired the other Mac).
+  func trustPendingFingerprint(for deviceID: String) {
+    guard let index = networkDevices.firstIndex(where: { $0.id == deviceID }),
+      let pending = networkDevices[index].pendingFingerprint
+    else { return }
+    networkDevices[index].fingerprint = pending
+    networkDevices[index].pendingFingerprint = nil
+    networkDevices[index].isActive = true
+    networkDevices[index].lastUpdated = Date()
+    saveNetworkDevices()
+  }
+
+  /// Tear down and re-start Bonjour browsing. Used by the "Refresh" button
+  /// when the discovered list goes stale (network change, sleep/wake).
+  func refreshDiscovery() {
+    discoveredNetworkDevices = []
+    serviceBrowser.refresh()
   }
 
   /// Adds a newly discovered network device
@@ -136,9 +158,12 @@ final class NetworkDeviceStore: ObservableObject, NetworkDeviceManageable {
       return
     }
 
-    let title = "New Notification"
-    let body =
-      "You have a new notification from \(Host.current().localizedName ?? "Unknown Device")"
+    let senderName = Host.current().localizedName ?? "another Mac"
+    // Put the sender's name in the title so the receiver's Notification
+    // Center entry is informative at a glance (previously the title was the
+    // generic "New Notification" and the sender's name was buried in the body).
+    let title = "Notification from \(senderName)"
+    let body = "Sent via Blue Switch."
     sendNotificationOverSecure(to: device, title: title, message: body) { result in
       switch result {
       case .success:
