@@ -210,8 +210,7 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
           return
         }
 
-        let registeredSet = Set(registeredIDs)
-        var available: [BluetoothPeripheral] = []
+        var paired: [BluetoothPeripheral] = []
         var connectedAddresses: Set<String> = []
 
         for device in pairedDevices {
@@ -219,15 +218,17 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
           if device.isConnected() {
             connectedAddresses.insert(address)
           }
-          if !registeredSet.contains(address) {
-            available.append(
-              BluetoothPeripheral(id: address, name: device.name ?? "Unknown Device")
-            )
-          }
+          paired.append(
+            BluetoothPeripheral(id: address, name: device.name ?? "Unknown Device")
+          )
         }
 
         DispatchQueue.main.async {
-          self.discoveredPeripherals = available
+          // Snapshot all paired devices; `availablePeripherals` filters out
+          // registered ones at read time. Filtering here instead would mean
+          // unregistering a peripheral can't immediately surface it under
+          // "Available" until the next fetch (e.g. tab switch).
+          self.discoveredPeripherals = paired
           for id in registeredIDs {
             let isConnected = connectedAddresses.contains(id)
             // Don't overwrite an in-flight .connecting state with a stale read.
