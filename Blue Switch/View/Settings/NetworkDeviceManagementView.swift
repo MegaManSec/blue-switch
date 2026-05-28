@@ -6,15 +6,10 @@ private enum Constants {
     static let availableDevices = "Available Devices"
     static let noConnectedDevices = "No connected devices"
     static let noAvailableDevices = "No available devices found"
-    static let removeAll = "Remove All"
     static let notify = "Notify"
     static let connect = "Connect"
     static let connectionLimitMessage =
       "Only one device can be connected at a time. Please remove existing device first."
-  }
-
-  enum Messages {
-    static let deviceGreeting = "Hello, %@!"
   }
 }
 
@@ -54,12 +49,6 @@ struct NetworkDeviceManagementView: View {
 
   private func handleDeviceNotification(_ device: NetworkDevice) {
     networkStore.sendNotification(to: device)
-  }
-
-  private func handleRemoveAllDevices() {
-    networkStore.networkDevices.forEach {
-      networkStore.removeNetworkDevice(device: $0)
-    }
   }
 
   private func handleDeviceRegistration(_ device: NetworkDevice) {

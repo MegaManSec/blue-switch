@@ -12,7 +12,6 @@
 		076AB2192CE9D690004D45F0 /* IOBluetoothDevice+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1F72CE9D690004D45F0 /* IOBluetoothDevice+Extension.swift */; };
 		076AB21A2CE9D690004D45F0 /* NetworkDevice+HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1F82CE9D690004D45F0 /* NetworkDevice+HealthCheck.swift */; };
 		076AB21B2CE9D690004D45F0 /* BluetoothManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FA2CE9D690004D45F0 /* BluetoothManager.swift */; };
-		076AB21C2CE9D690004D45F0 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FB2CE9D690004D45F0 /* ConnectionManager.swift */; };
 		076AB21D2CE9D690004D45F0 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FC2CE9D690004D45F0 /* NotificationManager.swift */; };
 		076AB21E2CE9D690004D45F0 /* ServiceBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FD2CE9D690004D45F0 /* ServiceBrowser.swift */; };
 		076AB21F2CE9D690004D45F0 /* ServicePublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076AB1FE2CE9D690004D45F0 /* ServicePublisher.swift */; };
@@ -35,30 +34,12 @@
 		076AB22D2CE9D690004D45F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 076AB2132CE9D690004D45F0 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		077474062CD8426F00571393 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 077473EA2CD8426D00571393 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 077473F12CD8426D00571393;
-			remoteInfo = "Blue Switch";
-		};
-		077474102CD8426F00571393 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 077473EA2CD8426D00571393 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 077473F12CD8426D00571393;
-			remoteInfo = "Blue Switch";
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
 		076AB1F42CE9D690004D45F0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		076AB1F52CE9D690004D45F0 /* Blue_SwitchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Blue_SwitchApp.swift; sourceTree = "<group>"; };
 		076AB1F72CE9D690004D45F0 /* IOBluetoothDevice+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IOBluetoothDevice+Extension.swift"; sourceTree = "<group>"; };
 		076AB1F82CE9D690004D45F0 /* NetworkDevice+HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDevice+HealthCheck.swift"; sourceTree = "<group>"; };
 		076AB1FA2CE9D690004D45F0 /* BluetoothManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothManager.swift; sourceTree = "<group>"; };
-		076AB1FB2CE9D690004D45F0 /* ConnectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManager.swift; sourceTree = "<group>"; };
 		076AB1FC2CE9D690004D45F0 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		076AB1FD2CE9D690004D45F0 /* ServiceBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceBrowser.swift; sourceTree = "<group>"; };
 		076AB1FE2CE9D690004D45F0 /* ServicePublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicePublisher.swift; sourceTree = "<group>"; };
@@ -81,26 +62,10 @@
 		076AB2132CE9D690004D45F0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		076AB2142CE9D690004D45F0 /* Blue_Switch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Blue_Switch.entitlements; sourceTree = "<group>"; };
 		077473F22CD8426D00571393 /* Blue Switch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Blue Switch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		077474052CD8426F00571393 /* Blue SwitchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Blue SwitchTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		0774740F2CD8426F00571393 /* Blue SwitchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Blue SwitchUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		077473EF2CD8426D00571393 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		077474022CD8426F00571393 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		0774740C2CD8426F00571393 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -132,7 +97,6 @@
 			isa = PBXGroup;
 			children = (
 				076AB1FA2CE9D690004D45F0 /* BluetoothManager.swift */,
-				076AB1FB2CE9D690004D45F0 /* ConnectionManager.swift */,
 				076AB1FC2CE9D690004D45F0 /* NotificationManager.swift */,
 				076AB1FD2CE9D690004D45F0 /* ServiceBrowser.swift */,
 				076AB1FE2CE9D690004D45F0 /* ServicePublisher.swift */,
@@ -236,8 +200,6 @@
 			isa = PBXGroup;
 			children = (
 				077473F22CD8426D00571393 /* Blue Switch.app */,
-				077474052CD8426F00571393 /* Blue SwitchTests.xctest */,
-				0774740F2CD8426F00571393 /* Blue SwitchUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -264,46 +226,6 @@
 			productReference = 077473F22CD8426D00571393 /* Blue Switch.app */;
 			productType = "com.apple.product-type.application";
 		};
-		077474042CD8426F00571393 /* Blue SwitchTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 0774741C2CD8426F00571393 /* Build configuration list for PBXNativeTarget "Blue SwitchTests" */;
-			buildPhases = (
-				077474012CD8426F00571393 /* Sources */,
-				077474022CD8426F00571393 /* Frameworks */,
-				077474032CD8426F00571393 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				077474072CD8426F00571393 /* PBXTargetDependency */,
-			);
-			name = "Blue SwitchTests";
-			packageProductDependencies = (
-			);
-			productName = "Blue SwitchTests";
-			productReference = 077474052CD8426F00571393 /* Blue SwitchTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		0774740E2CD8426F00571393 /* Blue SwitchUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 0774741F2CD8426F00571393 /* Build configuration list for PBXNativeTarget "Blue SwitchUITests" */;
-			buildPhases = (
-				0774740B2CD8426F00571393 /* Sources */,
-				0774740C2CD8426F00571393 /* Frameworks */,
-				0774740D2CD8426F00571393 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				077474112CD8426F00571393 /* PBXTargetDependency */,
-			);
-			name = "Blue SwitchUITests";
-			packageProductDependencies = (
-			);
-			productName = "Blue SwitchUITests";
-			productReference = 0774740F2CD8426F00571393 /* Blue SwitchUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -316,14 +238,6 @@
 				TargetAttributes = {
 					077473F12CD8426D00571393 = {
 						CreatedOnToolsVersion = 16.1;
-					};
-					077474042CD8426F00571393 = {
-						CreatedOnToolsVersion = 16.1;
-						TestTargetID = 077473F12CD8426D00571393;
-					};
-					0774740E2CD8426F00571393 = {
-						CreatedOnToolsVersion = 16.1;
-						TestTargetID = 077473F12CD8426D00571393;
 					};
 				};
 			};
@@ -344,8 +258,6 @@
 			projectRoot = "";
 			targets = (
 				077473F12CD8426D00571393 /* Blue Switch */,
-				077474042CD8426F00571393 /* Blue SwitchTests */,
-				0774740E2CD8426F00571393 /* Blue SwitchUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -357,20 +269,6 @@
 			files = (
 				076AB22C2CE9D690004D45F0 /* Preview Assets.xcassets in Resources */,
 				076AB22D2CE9D690004D45F0 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		077474032CD8426F00571393 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		0774740D2CD8426F00571393 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -386,7 +284,6 @@
 				076AB2192CE9D690004D45F0 /* IOBluetoothDevice+Extension.swift in Sources */,
 				076AB21A2CE9D690004D45F0 /* NetworkDevice+HealthCheck.swift in Sources */,
 				076AB21B2CE9D690004D45F0 /* BluetoothManager.swift in Sources */,
-				076AB21C2CE9D690004D45F0 /* ConnectionManager.swift in Sources */,
 				076AB21D2CE9D690004D45F0 /* NotificationManager.swift in Sources */,
 				076AB21E2CE9D690004D45F0 /* ServiceBrowser.swift in Sources */,
 				076AB21F2CE9D690004D45F0 /* ServicePublisher.swift in Sources */,
@@ -408,34 +305,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		077474012CD8426F00571393 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		0774740B2CD8426F00571393 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		077474072CD8426F00571393 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 077473F12CD8426D00571393 /* Blue Switch */;
-			targetProxy = 077474062CD8426F00571393 /* PBXContainerItemProxy */;
-		};
-		077474112CD8426F00571393 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 077473F12CD8426D00571393 /* Blue Switch */;
-			targetProxy = 077474102CD8426F00571393 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		077474172CD8426F00571393 /* Debug */ = {
@@ -616,72 +486,6 @@
 			};
 			name = Release;
 		};
-		0774741D2CD8426F00571393 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.tests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Blue Switch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Blue Switch";
-			};
-			name = Debug;
-		};
-		0774741E2CD8426F00571393 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.tests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Blue Switch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Blue Switch";
-			};
-			name = Release;
-		};
-		077474202CD8426F00571393 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.uitests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = "Blue Switch";
-			};
-			name = Debug;
-		};
-		077474212CD8426F00571393 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
-				MARKETING_VERSION = 0.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.megamansec.blue-switch.uitests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = "Blue Switch";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -699,24 +503,6 @@
 			buildConfigurations = (
 				0774741A2CD8426F00571393 /* Debug */,
 				0774741B2CD8426F00571393 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		0774741C2CD8426F00571393 /* Build configuration list for PBXNativeTarget "Blue SwitchTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				0774741D2CD8426F00571393 /* Debug */,
-				0774741E2CD8426F00571393 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		0774741F2CD8426F00571393 /* Build configuration list for PBXNativeTarget "Blue SwitchUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				077474202CD8426F00571393 /* Debug */,
-				077474212CD8426F00571393 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

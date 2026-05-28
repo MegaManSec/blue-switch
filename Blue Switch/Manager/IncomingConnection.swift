@@ -92,7 +92,15 @@ final class IncomingConnection {
         self.readNext()
       case .failure(let error):
         print("Handshake failed: \(error)")
-        self.rateLimiter.recordFailure(endpoint: self.endpoint)
+        // Only AEAD/auth failures indicate a credential-probe attempt.
+        // Framing, timeout, and network errors are flaky-network noise; if we
+        // count them we lock out the legitimate peer.
+        switch error {
+        case .decryptionFailed, .authFailed:
+          self.rateLimiter.recordFailure(endpoint: self.endpoint)
+        default:
+          break
+        }
         self.teardown()
       }
     }
@@ -105,13 +113,9 @@ final class IncomingConnection {
     channel.receive { [weak self] result in
       guard let self = self else { return }
       switch result {
-      case .failure(let error):
-        switch error {
-        case .connectionClosed:
-          break
-        default:
-          self.rateLimiter.recordFailure(endpoint: self.endpoint)
-        }
+      case .failure:
+        // Post-auth: any error is either network failure or peer misbehavior,
+        // neither helps a brute-force attacker. Just tear down.
         self.teardown()
       case .success(let data):
         self.resetIdleTimer()
@@ -143,14 +147,20 @@ final class IncomingConnection {
     case .notification, .syncPeripherals:
       break
     case .connectAll:
-      bluetoothStore.peripherals.forEach { peripheral in
-        bluetoothStore.connectPeripheral(peripheral)
+      let store = bluetoothStore
+      DispatchQueue.main.async {
+        store.peripherals.forEach { peripheral in
+          store.connectPeripheral(peripheral)
+        }
       }
       sendString(DeviceCommand.operationSuccess.rawValue)
       lastReceivedCommand = nil
     case .unregisterAll:
-      bluetoothStore.peripherals.forEach { peripheral in
-        bluetoothStore.unregisterFromPC(peripheral)
+      let store = bluetoothStore
+      DispatchQueue.main.async {
+        store.peripherals.forEach { peripheral in
+          store.unregisterFromPC(peripheral)
+        }
       }
       sendString(DeviceCommand.operationSuccess.rawValue)
       lastReceivedCommand = nil
@@ -176,7 +186,6 @@ final class IncomingConnection {
     case .syncPeripherals:
       guard let data = message.data(using: .utf8) else {
         print("syncPeripherals: invalid utf8")
-        rateLimiter.recordFailure(endpoint: endpoint)
         teardown()
         return
       }
@@ -186,7 +195,6 @@ final class IncomingConnection {
         sendString(DeviceCommand.operationSuccess.rawValue)
       } catch {
         print("syncPeripherals decode failed: \(error)")
-        rateLimiter.recordFailure(endpoint: endpoint)
         sendString(DeviceCommand.operationFailed.rawValue)
         teardown()
         return

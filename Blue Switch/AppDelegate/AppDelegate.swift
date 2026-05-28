@@ -5,8 +5,8 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
   // MARK: - Dependencies
 
-  @ObservedObject private var networkStore = NetworkDeviceStore.shared
-  @ObservedObject private var bluetoothStore = BluetoothPeripheralStore.shared
+  private let networkStore = NetworkDeviceStore.shared
+  private let bluetoothStore = BluetoothPeripheralStore.shared
 
   // MARK: - UI Components
 
@@ -114,7 +114,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
           }
         case .allDisconnected:
-          // 1. Request disconnect from peer and connect self
           self.networkStore.executeCommand(.unregisterAll) { success in
             if success {
               self.bluetoothStore.peripherals.forEach { peripheral in
@@ -126,10 +125,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 body: "Failed to request device disconnection from peer"
               )
             }
-          }
-          // 2. Execugte connection of all devices
-          self.bluetoothStore.peripherals.forEach { peripheral in
-            self.bluetoothStore.connectPeripheral(peripheral)
           }
         case .partial:
           NotificationManager.showNotification(
@@ -164,8 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func check() {
       attempts += 1
 
-      // Check if all devices are disconnected
-      let allDisconnected = !bluetoothStore.isAllDevicesConnected
+      let allDisconnected = bluetoothStore.checkActualConnectionStatus() == .allDisconnected
 
       if allDisconnected {
         completion(true)

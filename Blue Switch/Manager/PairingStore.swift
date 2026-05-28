@@ -8,7 +8,6 @@ enum PairingError: Error {
   case invalidCode
   case derivationFailed
   case keychainFailed(OSStatus)
-  case notPaired
 }
 
 /// Manages the pre-shared key used to authenticate peer Blue Switch installs.
@@ -21,12 +20,12 @@ final class PairingStore: ObservableObject {
 
   // MARK: - Constants
 
-  static let codeLength = 9
+  static let codeLength = 12
   static let codeAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-  private static let pbkdfSalt = "BlueSwitch-PSK-v1"
+  private static let pbkdfSalt = "BlueSwitch-PSK-v2"
   private static let pbkdfIterations: UInt32 = 600_000
   private static let pbkdfKeyLength = 32
-  private static let keychainService = "com.blueswitch.psk-v1"
+  private static let keychainService = "com.blueswitch.psk-v2"
   private static let keychainAccount = "shared"
 
   // MARK: - Published State
@@ -61,12 +60,12 @@ final class PairingStore: ObservableObject {
     return result
   }
 
-  /// Returns a display form (`XXX-XXX-XXX`) for a 9-char code.
+  /// Returns a display form (`XXXX-XXXX-XXXX`) for a 12-char code.
   static func formatCode(_ code: String) -> String {
     let normalized = normalize(code)
     guard normalized.count == codeLength else { return normalized }
     let chars = Array(normalized)
-    return "\(String(chars[0...2]))-\(String(chars[3...5]))-\(String(chars[6...8]))"
+    return "\(String(chars[0...3]))-\(String(chars[4...7]))-\(String(chars[8...11]))"
   }
 
   /// Normalizes free-form user input: uppercase, strip dashes/spaces.
@@ -179,7 +178,8 @@ final class PairingStore: ObservableObject {
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: Self.keychainService,
       kSecAttrAccount as String: Self.keychainAccount,
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+      kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+      kSecAttrSynchronizable as String: false,
       kSecValueData as String: data,
     ]
     let status = SecItemAdd(add as CFDictionary, nil)

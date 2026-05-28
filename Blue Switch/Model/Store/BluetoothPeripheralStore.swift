@@ -54,14 +54,6 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
     }
   }
 
-  var isAllDevicesConnected: Bool {
-    guard !peripherals.isEmpty else { return false }
-    return peripherals.allSatisfy { peripheral in
-      guard let btDevice = IOBluetoothDevice(addressString: peripheral.id) else { return false }
-      return btDevice.isConnected()
-    }
-  }
-
   // MARK: - Initialization
 
   private init() {
@@ -102,18 +94,10 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
 
   /// Completely remove device from list
   func removeFromList(_ peripheral: BluetoothPeripheral) {
-    guard let index = peripherals.firstIndex(where: { $0.id == peripheral.id }) else {
+    guard peripherals.contains(where: { $0.id == peripheral.id }) else {
       print("\(peripheral.name) does not exist in the list")
       return
     }
-
-    //    if let btDevice = IOBluetoothDevice(addressString: peripheral.id),
-    //      btDevice.isConnected()
-    //    {
-    //      print("\(peripheral.name) is connected. Please disconnect before removing")
-    //      return
-    //    }
-
     peripherals.removeAll { $0.id == peripheral.id }
     print("\(peripheral.name) has been removed from the list")
   }
@@ -146,21 +130,12 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
         return
       }
 
-      devicePair.delegate = self
       let pairResult = devicePair.start()
 
       if pairResult == kIOReturnSuccess {
-        // Check actual connection status
         let connectResult = btDevice.openConnection()
         if connectResult == kIOReturnSuccess && btDevice.isConnected() {
-          DispatchQueue.main.async {
-            guard let index = self.peripherals.firstIndex(where: { $0.id == peripheral.id }) else {
-              return
-            }
-            var updatedPeripheral = peripheral
-            self.peripherals[index] = updatedPeripheral
-            print("Connected to \(peripheral.name)")
-          }
+          print("Connected to \(peripheral.name)")
         } else {
           print("Failed to connect to \(peripheral.name). Error code: \(connectResult)")
         }
@@ -239,8 +214,6 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
   /// Updates the peripheral list with new data from sync
   /// - Parameter newPeripherals: Array of peripherals to update with
   func updatePeripherals(_ newPeripherals: [BluetoothPeripheral]) {
-    print("Debug: Starting peripheral update with \(newPeripherals.count) devices")
-
     // Cap inbound list size; reject larger payloads outright.
     guard newPeripherals.count <= 64 else {
       print("Rejecting peripheral sync: list exceeds cap of 64")
@@ -254,13 +227,7 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
       return
     }
 
-    print("Debug: Current peripherals count: \(peripherals.count)")
-
     peripherals = newPeripherals
-    print("Debug: After update peripherals count: \(peripherals.count)")
-    print("Debug: Updated peripherals: \(peripherals.map { $0.name })")
-
-    savePeripherals()
   }
 
   // MARK: - Private Methods
@@ -283,22 +250,6 @@ final class BluetoothPeripheralStore: ObservableObject, BluetoothPeripheralManag
   }
 
   // MARK: - Helper Methods
-
-  private func handleConnectionResult(result: IOReturn, peripheralName: String) {
-    if result == kIOReturnSuccess {
-      print("\(peripheralName) has been connected")
-    } else {
-      print("Failed to connect to \(peripheralName). Error code: \(result)")
-    }
-  }
-
-  private func handleDisconnectionResult(result: IOReturn, peripheralName: String) {
-    if result == kIOReturnSuccess {
-      print("Disconnected from \(peripheralName)")
-    } else {
-      print("Failed to disconnect from \(peripheralName)")
-    }
-  }
 
   private func validateBluetoothState() -> Bool {
     let powerState = IOBluetoothHostController.default().powerState

@@ -10,10 +10,8 @@ struct Blue_SwitchApp: App {
   // MARK: - Scene Configuration
 
   var body: some Scene {
-    #if os(macOS)
-      Settings {
-        SettingsView()
-      }
-    #endif
+    Settings {
+      SettingsView()
+    }
   }
 }

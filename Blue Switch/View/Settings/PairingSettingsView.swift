@@ -112,11 +112,6 @@ private struct GenerateCodeSheet: View {
           .font(.caption)
       }
       HStack {
-        Button("Copy") {
-          let pb = NSPasteboard.general
-          pb.clearContents()
-          pb.setString(PairingStore.formatCode(code), forType: .string)
-        }
         Button("Cancel") {
           isPresented = false
         }
@@ -148,7 +143,7 @@ private struct EnterCodeSheet: View {
     VStack(spacing: 20) {
       Text("Enter Pairing Code")
         .font(.headline)
-      TextField("XXX-XXX-XXX", text: $input)
+      TextField("XXXX-XXXX-XXXX", text: $input)
         .textFieldStyle(RoundedBorderTextFieldStyle())
         .font(.system(.title2, design: .monospaced))
         .onChange(of: input) { newValue in
@@ -171,7 +166,7 @@ private struct EnterCodeSheet: View {
         Button("Pair") {
           let normalized = PairingStore.normalize(input)
           guard PairingStore.isValid(normalized) else {
-            errorMessage = "Code must be 9 characters from the pairing alphabet."
+            errorMessage = "Code must be 12 characters from the pairing alphabet."
             return
           }
           do {

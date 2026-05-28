@@ -17,8 +17,11 @@ enum SecureChannelError: Error {
 /// On-wire framing + ChaCha20-Poly1305 session for a single NWConnection.
 /// Handshake:
 ///   * Each side sends a 32-byte random nonce (length-prefixed cleartext).
-///   * Both derive HKDF(K, salt=N_C||N_S) -> [sk_c2s | sk_s2c].
-///   * First sealed message MUST equal ASCII "AUTH_OK".
+///   * Both derive HKDF(K, salt=N_C||N_S) -> [sk_c2s | sk_s2c | k_mac] (96 bytes).
+///   * Each side sends a sealed `HMAC(k_mac, role || N_C || N_S)` over the
+///     handshake transcript and verifies the peer's MAC in constant time.
+/// The role tag prevents reflection: Mac A can't replay its MAC back as if
+/// it were Mac B's.
 /// After auth, each sealed frame is [u32-BE length][12-byte counter nonce][ciphertext+tag].
 final class SecureChannel {
   // MARK: - Constants
@@ -26,8 +29,9 @@ final class SecureChannel {
   static let nonceLength = 32
   static let maxFrameSize: UInt32 = 65536
   static let aeadNonceLength = 12
-  static let authMagic = "AUTH_OK"
-  private static let hkdfInfo = Data("blueswitch-session-v1".utf8)
+  private static let hkdfInfo = Data("blueswitch-session-v2".utf8)
+  private static let clientRoleTag = Data("client".utf8)
+  private static let serverRoleTag = Data("server".utf8)
   private static let handshakeTimeout: TimeInterval = 5.0
 
   // MARK: - Roles
@@ -46,6 +50,7 @@ final class SecureChannel {
 
   private var sendKey: SymmetricKey?
   private var receiveKey: SymmetricKey?
+  private var macKey: SymmetricKey?
   private var sendCounter: UInt64 = 0
   private var lastReceivedCounter: UInt64?
   private var receivedAuth: Bool = false
@@ -62,9 +67,9 @@ final class SecureChannel {
 
   // MARK: - Handshake
 
-  /// Performs the handshake and verifies the peer's AUTH_OK. On success, calls
-  /// `completion(.success(()))`; on failure, closes the connection and returns
-  /// the relevant error.
+  /// Performs the handshake and verifies the peer's transcript MAC. On
+  /// success calls `completion(.success(()))`; on failure closes the
+  /// connection and returns the relevant error.
   func performHandshake(completion: @escaping (Result<Void, SecureChannelError>) -> Void) {
     var localNonce = Data(count: Self.nonceLength)
     _ = localNonce.withUnsafeMutableBytes { buf in
@@ -101,23 +106,43 @@ final class SecureChannel {
             completion(.failure(.framingFailed))
             return
           }
-          self.deriveKeys(localNonce: localNonce, remoteNonce: remoteNonce)
 
-          // Send sealed AUTH_OK.
-          self.sendSealed(payload: Data(Self.authMagic.utf8)) { sealErr in
+          let (clientNonce, serverNonce): (Data, Data)
+          switch self.role {
+          case .client: (clientNonce, serverNonce) = (localNonce, remoteNonce)
+          case .server: (clientNonce, serverNonce) = (remoteNonce, localNonce)
+          }
+
+          self.deriveKeys(clientNonce: clientNonce, serverNonce: serverNonce)
+
+          guard let macKey = self.macKey else {
+            timeoutWork.cancel()
+            completion(.failure(.authFailed))
+            return
+          }
+
+          let ourTag: Data = (self.role == .client) ? Self.clientRoleTag : Self.serverRoleTag
+          let peerTag: Data = (self.role == .client) ? Self.serverRoleTag : Self.clientRoleTag
+          let ourMac = Data(
+            HMAC<SHA256>.authenticationCode(
+              for: ourTag + clientNonce + serverNonce, using: macKey))
+          let expectedPeerMac = Data(
+            HMAC<SHA256>.authenticationCode(
+              for: peerTag + clientNonce + serverNonce, using: macKey))
+
+          self.sendSealed(payload: ourMac) { sealErr in
             if let sealErr = sealErr {
               timeoutWork.cancel()
               completion(.failure(sealErr))
               return
             }
-            // Receive sealed AUTH_OK from peer.
             self.receiveSealed { recvResult in
               timeoutWork.cancel()
               switch recvResult {
               case .failure(let e):
                 completion(.failure(e))
-              case .success(let plaintext):
-                if plaintext == Data(Self.authMagic.utf8) {
+              case .success(let receivedMac):
+                if Self.constantTimeEqual(receivedMac, expectedPeerMac) {
                   self.receivedAuth = true
                   completion(.success(()))
                 } else {
@@ -131,14 +156,7 @@ final class SecureChannel {
     }
   }
 
-  private func deriveKeys(localNonce: Data, remoteNonce: Data) {
-    let (clientNonce, serverNonce): (Data, Data) = {
-      switch role {
-      case .client: return (localNonce, remoteNonce)
-      case .server: return (remoteNonce, localNonce)
-      }
-    }()
-
+  private func deriveKeys(clientNonce: Data, serverNonce: Data) {
     var salt = Data()
     salt.append(clientNonce)
     salt.append(serverNonce)
@@ -147,12 +165,13 @@ final class SecureChannel {
       inputKeyMaterial: psk,
       salt: salt,
       info: Self.hkdfInfo,
-      outputByteCount: 64
+      outputByteCount: 96
     )
 
     let raw = derived.withUnsafeBytes { Data($0) }
     let c2s = SymmetricKey(data: raw.prefix(32))
-    let s2c = SymmetricKey(data: raw.suffix(32))
+    let s2c = SymmetricKey(data: raw.dropFirst(32).prefix(32))
+    let mac = SymmetricKey(data: raw.suffix(32))
 
     switch role {
     case .client:
@@ -162,6 +181,7 @@ final class SecureChannel {
       sendKey = s2c
       receiveKey = c2s
     }
+    macKey = mac
   }
 
   // MARK: - Public Sealed I/O
@@ -210,13 +230,15 @@ final class SecureChannel {
       frame.append(box.nonce.withUnsafeBytes { Data($0) })
       frame.append(box.ciphertext)
       frame.append(box.tag)
-      sendRaw(payload: frame, completion: { err in
-        if let err = err {
-          completion(.sendFailed(err))
-        } else {
-          completion(nil)
-        }
-      })
+      sendRaw(
+        payload: frame,
+        completion: { err in
+          if let err = err {
+            completion(.sendFailed(err))
+          } else {
+            completion(nil)
+          }
+        })
     } catch {
       completion(.decryptionFailed)
     }
@@ -311,7 +333,7 @@ final class SecureChannel {
   ) {
     connection.receive(minimumIncompleteLength: byteCount, maximumLength: byteCount) {
       data, _, isComplete, error in
-      if let _ = error {
+      if error != nil {
         completion(.failure(.connectionClosed))
         return
       }
@@ -325,5 +347,24 @@ final class SecureChannel {
       }
       completion(.success(data))
     }
+  }
+
+  // MARK: - Helpers
+
+  /// Constant-time byte comparison. Same length only; differing lengths
+  /// return false without revealing position via timing.
+  static func constantTimeEqual(_ a: Data, _ b: Data) -> Bool {
+    guard a.count == b.count else { return false }
+    var diff: UInt8 = 0
+    a.withUnsafeBytes { aRaw in
+      b.withUnsafeBytes { bRaw in
+        let aBytes = aRaw.bindMemory(to: UInt8.self)
+        let bBytes = bRaw.bindMemory(to: UInt8.self)
+        for i in 0..<a.count {
+          diff |= aBytes[i] ^ bBytes[i]
+        }
+      }
+    }
+    return diff == 0
   }
 }

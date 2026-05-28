@@ -9,7 +9,6 @@ struct SettingsView: View {
     /// Configuration for each tab
     static let devices = (image: "keyboard", text: "Peripheral")
     static let mac = (image: "desktopcomputer", text: "Device")
-    static let general = (image: "gearshape.fill", text: "General")
     static let pairing = (image: "lock.shield", text: "Pairing")
     static let other = (image: "ellipsis.circle", text: "Other")
   }

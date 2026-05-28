@@ -1,3 +1,4 @@
+import Foundation
 import Network
 
 /// Represents the result of a health check operation
@@ -9,8 +10,6 @@ enum HealthCheckResult {
 
 /// Protocol defining health check functionality for network devices
 protocol HealthCheckable {
-  /// Performs a health check on the device
-  /// - Parameter completion: Closure called with the result of the health check
   func checkHealth(completion: @escaping (HealthCheckResult) -> Void)
 }
 
@@ -21,32 +20,34 @@ extension NetworkDevice: HealthCheckable {
       port: NWEndpoint.Port(integerLiteral: UInt16(port)),
       using: .tcp
     )
+    let queue = DispatchQueue(label: "com.blueswitch.healthcheck")
+    var fired = false
 
-    let timeout = DispatchTime.now() + .seconds(5)
+    // Serialised on `queue` (both the state handler and the timeout closure
+    // run there), so `fired` is the only gate needed.
+    func finish(_ result: HealthCheckResult) {
+      guard !fired else { return }
+      fired = true
+      connection.stateUpdateHandler = nil
+      connection.cancel()
+      completion(result)
+    }
 
     connection.stateUpdateHandler = { state in
       switch state {
       case .ready:
-        // Connection successful
-        connection.cancel()
-        completion(.success)
+        finish(.success)
       case .failed(let error):
-        connection.cancel()
-        completion(.failure(error.localizedDescription))
-      case .cancelled:
-        break
+        finish(.failure(error.localizedDescription))
       default:
         break
       }
     }
 
-    connection.start(queue: .global())
+    connection.start(queue: queue)
 
-    DispatchQueue.global().asyncAfter(deadline: timeout) {
-      if connection.state != .cancelled {
-        connection.cancel()
-        completion(.timeout)
-      }
+    queue.asyncAfter(deadline: .now() + .seconds(5)) {
+      finish(.timeout)
     }
   }
 }
