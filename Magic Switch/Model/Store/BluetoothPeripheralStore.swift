@@ -184,8 +184,10 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
   /// only honor one host at a time, so `IOBluetoothDevicePair.start()`
   /// would hang otherwise.
   ///
-  /// Falls back to a plain local pair if there's no paired peer, the
-  /// peer is offline, or we're not paired ourselves.
+  /// Falls back to a plain local pair if there's no paired peer, we're not
+  /// paired ourselves, or the peer can't be reached — whether Bonjour
+  /// already marked it inactive or it only turns out to be unreachable when
+  /// we try to send (e.g. the other laptop's lid just closed).
   func takePeripheralFromPeer(_ peripheral: BluetoothPeripheral) {
     let networkStore = NetworkDeviceStore.shared
     guard let device = networkStore.networkDevices.first,
@@ -203,6 +205,17 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
       guard let self = self else { return }
       switch result {
       case .success:
+        self.connectPeripheral(peripheral)
+      case .failure(.connectionFailed), .failure(.connectTimeout):
+        // We never got a TCP connection up, so the peer's machine is
+        // unreachable (asleep, off the network, app not running) and isn't
+        // holding the peripheral anymore — a Mac that drops off the network
+        // has already released its Bluetooth devices. Pair locally instead
+        // of stranding the user with an error they can't act on. We
+        // deliberately don't do this for post-connect failures: if the
+        // connection opened, the peer's machine is awake and may still
+        // actively hold the peripheral, so a local grab would yank it out
+        // from under the peer and leave it in a stale state.
         self.connectPeripheral(peripheral)
       case .failure(let err):
         self.setConnectionState(.disconnected, for: peripheral.id)
