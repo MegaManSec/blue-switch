@@ -174,7 +174,7 @@ final class IncomingConnection {
   private func handleCommand(_ command: DeviceCommand) {
     lastReceivedCommand = command
     switch command {
-    case .notification, .syncPeripherals, .unregisterOne, .connectOne:
+    case .notification, .syncPeripherals, .unregisterOne, .connectOne, .holdsOne:
       // Two-frame commands; data frame handled in `handleCommandData`.
       break
     case .connectAll:
@@ -286,6 +286,24 @@ final class IncomingConnection {
         }
       }
       sendString(DeviceCommand.operationSuccess.rawValue)
+    case .holdsOne:
+      guard Self.isValidMACAddress(message) else {
+        print("holdsOne: invalid MAC address: \(message)")
+        sendString(DeviceCommand.operationFailed.rawValue)
+        break
+      }
+      // Read-only query: OP_SUCCESS only if we have a live connection to it,
+      // so the peer's wake-time reclaim won't grab a peripheral we're using.
+      // The BT check completes on the Bluetooth queue; hop back to the
+      // connection queue so all sealed sends stay serialized there (the send
+      // counter isn't synchronized across queues).
+      bluetoothStore.isHoldingPeripheral(address: message) { [weak self] held in
+        guard let self = self else { return }
+        self.queue.async {
+          self.sendString(
+            (held ? DeviceCommand.operationSuccess : DeviceCommand.operationFailed).rawValue)
+        }
+      }
     default:
       break
     }

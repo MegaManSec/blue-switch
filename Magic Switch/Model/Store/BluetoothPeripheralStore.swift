@@ -37,15 +37,35 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
     /// hosts) can legitimately take 30-45s, and a false-positive timeout
     /// is worse than waiting a beat longer.
     static let pairTimeout: TimeInterval = 60
+    /// How long after wake to wait before deciding whether the peer holds a
+    /// peripheral we released for sleep. Gives Wi-Fi time to reassociate so a
+    /// peer that's actively using the peripheral doesn't look unreachable and
+    /// get it yanked back.
+    static let wakeReclaimDelay: TimeInterval = 5
   }
 
   // MARK: - Dependencies
 
   private let bluetoothQueue = DispatchQueue(label: Constants.queueLabel, qos: .userInitiated)
 
+  /// Releases held peripherals just before this Mac sleeps. A sleeping Mac
+  /// can't be asked to release over the network, so we hand them off *before*
+  /// becoming unreachable.
+  private let sleepMonitor = SleepMonitor()
+
   // MARK: - Properties
 
+  /// `@AppStorage` key for the "release peripherals when this Mac sleeps"
+  /// preference. Referenced by the Other settings tab's toggle too, so it
+  /// lives here as the single source of truth for the key string.
+  static let releaseOnSleepDefaultsKey = "releaseHeldPeripheralsOnSleep"
+
   @AppStorage("peripherals") private var peripheralsData: Data = Data()
+
+  /// When set (default), `releaseHeldPeripheralsForSleep` runs on system
+  /// sleep. Off lets a user keep a peripheral bonded to a Mac that sleeps.
+  @AppStorage(BluetoothPeripheralStore.releaseOnSleepDefaultsKey)
+  private var releaseOnSleep: Bool = true
 
   @Published private(set) var peripherals: [BluetoothPeripheral] = [] {
     didSet {
@@ -72,6 +92,11 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
   /// timer flips the peripheral back to `.disconnected` so the UI unsticks.
   private var pairTimers: [String: DispatchSourceTimer] = [:]
 
+  /// MAC addresses released by `releaseHeldPeripheralsForSleep` on the last
+  /// sleep. On wake we reclaim any the peer didn't take. The process stays
+  /// alive across sleep, so an in-memory set is enough.
+  private var peripheralsReleasedForSleep: Set<String> = []
+
   /// Global IOBluetooth connect observer. Fires for *any* device the OS
   /// pairs/connects, including ones the user connects via the system
   /// Bluetooth menu (not via Magic Switch). Used to keep the Peripheral tab
@@ -97,6 +122,118 @@ final class BluetoothPeripheralStore: NSObject, ObservableObject, BluetoothPerip
     loadPeripherals()
     fetchConnectedPeripherals()
     registerForSystemBluetoothConnects()
+    setupSleepRelease()
+  }
+
+  /// Hand held peripherals back to the peer the moment before this Mac
+  /// sleeps, so they're free for the peer to take rather than stranded on a
+  /// machine that can no longer be reached to release them.
+  private func setupSleepRelease() {
+    sleepMonitor.onWillSleep = { [weak self] in
+      self?.releaseHeldPeripheralsForSleep()
+    }
+    sleepMonitor.onDidWake = { [weak self] in
+      self?.reclaimPeripheralsAfterWake()
+    }
+    sleepMonitor.start()
+  }
+
+  /// Runs (on main) from `SleepMonitor` immediately before sleep, with the
+  /// power transition held until it returns. Releases every peripheral this
+  /// Mac currently holds so the peer can take it cleanly, and records them so
+  /// `reclaimPeripheralsAfterWake` can take back any the peer didn't.
+  ///
+  /// Gated on the peer looking present (paired + a registered device we're
+  /// currently seeing on Bonjour). If no peer is around there's no one to
+  /// hand off to, so we keep the peripherals bonded rather than orphan them —
+  /// `IORegisterForSystemPower` can't read a peer that isn't there.
+  ///
+  /// The IOBluetooth removes run synchronously on `bluetoothQueue` (the only
+  /// place IOBluetooth is touched) so they land before the radio powers down.
+  private func releaseHeldPeripheralsForSleep() {
+    peripheralsReleasedForSleep = []
+    guard releaseOnSleep,
+      PairingStore.shared.isPaired,
+      NetworkDeviceStore.shared.networkDevices.contains(where: { $0.isActive })
+    else { return }
+
+    // Snapshot `peripherals` on main before hopping to the Bluetooth queue.
+    let held = peripherals
+    guard !held.isEmpty else { return }
+
+    var releasedIDs: [String] = []
+    bluetoothQueue.sync {
+      for peripheral in held {
+        guard let device = IOBluetoothDevice(addressString: peripheral.id),
+          device.isConnected()
+        else { continue }
+        if device.responds(to: Selector(("remove"))) {
+          device.perform(Selector(("remove")))
+        } else {
+          _ = device.closeConnection()
+        }
+        releasedIDs.append(peripheral.id)
+      }
+    }
+
+    // Back on main (we never left it); reflect the releases in the UI so the
+    // Peripheral tab is correct on wake, and remember them for reclaim.
+    peripheralsReleasedForSleep = Set(releasedIDs)
+    for id in releasedIDs {
+      setConnectionState(.disconnected, for: id)
+    }
+    if !releasedIDs.isEmpty {
+      print("Released \(releasedIDs.count) peripheral(s) before sleep")
+    }
+  }
+
+  /// Runs (on main) from `SleepMonitor` after wake. For each peripheral we
+  /// released for sleep, ask the peer whether it actually took it; reclaim
+  /// only the ones it didn't (or can't be reached for). Waits
+  /// `Constants.wakeReclaimDelay` first so the network can reassociate —
+  /// otherwise a peer actively using the peripheral could look unreachable
+  /// and we'd wrongly grab it back.
+  private func reclaimPeripheralsAfterWake() {
+    let ids = peripheralsReleasedForSleep
+    peripheralsReleasedForSleep = []
+    guard !ids.isEmpty else { return }
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + Constants.wakeReclaimDelay) {
+      [weak self] in
+      guard let self = self else { return }
+      // The registered peer (not gated on `isActive`: Bonjour may not have
+      // re-resolved yet, but `executeHoldsOne` actually connects, so
+      // reachability is decided there).
+      let device = NetworkDeviceStore.shared.networkDevices.first
+      for id in ids {
+        guard let peripheral = self.peripherals.first(where: { $0.id == id }) else { continue }
+        guard let device = device, PairingStore.shared.isPaired else {
+          // No peer to ask — these are ours; take them back.
+          self.connectPeripheral(peripheral)
+          continue
+        }
+        NetworkDeviceStore.shared.executeHoldsOne(address: id, on: device) {
+          [weak self] result in
+          guard let self = self else { return }
+          // `.success` = peer holds it (in use over there) → leave it.
+          // Any `.failure` (peer says no, or unreachable) → take it back.
+          if case .failure = result {
+            self.connectPeripheral(peripheral)
+          }
+        }
+      }
+    }
+  }
+
+  /// Whether this Mac currently has a live Bluetooth connection to the
+  /// peripheral with `address`. Answered off the live IOBluetooth state on
+  /// `bluetoothQueue`; the completion fires on that queue. Used by the peer's
+  /// `HOLDS_ONE` query so its wake-time reclaim skips peripherals we hold.
+  func isHoldingPeripheral(address: String, completion: @escaping (Bool) -> Void) {
+    bluetoothQueue.async {
+      let connected = IOBluetoothDevice(addressString: address)?.isConnected() ?? false
+      completion(connected)
+    }
   }
 
   /// Register for every Bluetooth connect the OS sees, so the Peripheral

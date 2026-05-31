@@ -8,6 +8,8 @@ struct OtherSettingsView: View {
   @Environment(\.openURL) private var openURL
   @ObservedObject private var updateChecker = UpdateChecker.shared
   @State private var launchAtLogin: Bool = false
+  @AppStorage(BluetoothPeripheralStore.releaseOnSleepDefaultsKey)
+  private var releaseOnSleep: Bool = true
 
   // MARK: - View Content
 
@@ -20,6 +22,12 @@ struct OtherSettingsView: View {
             .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
             .help("Start Magic Switch automatically when you log in to this Mac.")
         }
+      }
+      Section {
+        Toggle("Release peripherals when this Mac sleeps", isOn: $releaseOnSleep)
+          .help(
+            "When this Mac sleeps, hand its Magic peripherals back so your other Mac can take them. A sleeping Mac can't be asked to release them over the network, so Magic Switch releases them just before sleeping. Turn off to keep a peripheral bonded to this Mac while it sleeps."
+          )
       }
       Section {
         SettingsRowView(

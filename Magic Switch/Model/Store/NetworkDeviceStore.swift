@@ -205,6 +205,12 @@ enum DeviceCommand: String, Codable {
   /// Two-frame: opcode then a single peripheral's MAC address. The peer
   /// connects just that peripheral.
   case connectOne = "CONNECT_ONE"
+  /// Two-frame: opcode then a single peripheral's MAC address. The peer acks
+  /// `OP_SUCCESS` if it currently holds (has a live Bluetooth connection to)
+  /// that peripheral, `OP_FAILED` otherwise. Read-only — used by the
+  /// wake-time reclaim to avoid grabbing a peripheral the peer is actively
+  /// using.
+  case holdsOne = "HOLDS_ONE"
   /// Single-frame no-op the peer immediately acks. Used as a secure-channel
   /// preflight: a TCP-open `checkHealth` doesn't prove the peer's app will
   /// accept commands, but a PING that handshakes + receives OP_SUCCESS
@@ -412,6 +418,18 @@ extension NetworkDeviceStore {
     completion: @escaping (Result<Void, OutgoingFailure>) -> Void
   ) {
     sendTwoFrameCommand(.connectOne, payload: address, to: device, completion: completion)
+  }
+
+  /// Asks `device` whether it currently holds the peripheral with the given
+  /// MAC. `.success` means the peer holds it (so leave it alone); any
+  /// `.failure` — an explicit "no" or an unreachable peer — means it's free
+  /// for us to reclaim. Two-frame protocol mirroring `executeUnregisterOne`.
+  func executeHoldsOne(
+    address: String,
+    on device: NetworkDevice,
+    completion: @escaping (Result<Void, OutgoingFailure>) -> Void
+  ) {
+    sendTwoFrameCommand(.holdsOne, payload: address, to: device, completion: completion)
   }
 
   /// Shared helper for "opcode + single payload frame, await OP_SUCCESS".
